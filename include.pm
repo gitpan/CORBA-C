@@ -11,7 +11,7 @@ use POSIX qw(ctime);
 package CORBA::C::include;
 
 use vars qw($VERSION);
-$VERSION = '2.40';
+$VERSION = '2.41';
 
 package CORBA::C::includeVisitor;
 
@@ -101,6 +101,15 @@ sub visitSpecification {
 	print $FH "#include <",$self->{incpath},"corba.h>\n";
 #	print $FH "#include \"corba.h\"\n";
 	print $FH "\n";
+	if (exists $node->{list_import}) {
+		foreach (@{$node->{list_import}}) {
+			my $basename = $_->{value};
+			$basename =~ s/^:://;
+			$basename =~ s/::/_/g;
+			print $FH "#include \"",$basename,".h\"\n";
+		}
+		print $FH "\n";
+	}
 	foreach (@{$node->{list_decl}}) {
 		$self->_get_defn($_)->visit($self);
 	}
@@ -129,10 +138,7 @@ sub visitModule {
 	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		my $filename = $self->{srcname};	# Pb io_
-		$filename =~ s/^([^\/]+\/)+//;
-		$filename =~ s/\.idl$//i;
-		$filename .= '.h';
+		my $filename = basename($self->{srcname}, ".idl") . ".h";
 		$filename =~ s/\./_/;
 		my $defn = $self->{symbtab}->Lookup($node->{full});
 		print $FH "/*\n";
@@ -762,6 +768,14 @@ sub visitTypeId {
 }
 
 sub visitTypePrefix {
+	# empty
+}
+
+#
+#	XPIDL
+#
+
+sub visitCodeFragment {
 	# empty
 }
 

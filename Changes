@@ -1,5 +1,8 @@
 Revision history for Perl extension CORBA::C.
 
+2.41  Mon Jun  7 08:30:00 2004
+	- better support for 'import'
+
 2.40  Tue May 18 18:30:00 2004
 	- compatible with CORBA::IDL 2.40
 
