@@ -7,7 +7,7 @@ use UNIVERSAL;
 #			C Language Mapping Specification, New Edition June 1999
 #
 
-package CnameVisitor;
+package CORBA::C::nameVisitor;
 
 # builds $node->{c_name}
 
@@ -16,7 +16,7 @@ sub new {
 	my $class = ref($proto) || $proto;
 	my $self = {};
 	bless($self, $class);
-	my($parser) = @_;
+	my ($parser) = @_;
 	$self->{key} = 'c_name';
 	$self->{symbtab} = $parser->YYData->{symbtab};
 	return $self;
@@ -24,7 +24,7 @@ sub new {
 
 sub _get_defn {
 	my $self = shift;
-	my($defn) = @_;
+	my ($defn) = @_;
 	if (ref $defn) {
 		return $defn;
 	} else {
@@ -37,7 +37,7 @@ sub _get_defn {
 #
 sub _get_name {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $name = $node->{full};
 	$name =~ s/^:://;
 	$name =~ s/::/_/g;
@@ -48,11 +48,11 @@ sub _get_name {
 #	3.5		OMG IDL Specification
 #
 
-sub visitNameSpecification {
+sub visitSpecification {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
 }
 
@@ -60,12 +60,12 @@ sub visitNameSpecification {
 #	3.7		Module Declaration
 #
 
-sub visitNameModules {
+sub visitModules {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
 }
 
@@ -73,35 +73,42 @@ sub visitNameModules {
 #	3.8		Interface Declaration
 #
 
-sub visitNameBaseInterface {
+sub visitBaseInterface {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
+}
+
+sub visitForwardBaseInterface {
+	my $self = shift;
+	my ($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = $self->_get_name($node);
 }
 
 #
 #	3.9		Value Declaration
 #
 
-sub visitNameStateMember {
+sub visitStateMember {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $self->_get_name($node);
-	$self->_get_defn($node->{type})->visitName($self);
+	$self->_get_defn($node->{type})->visit($self);
 }
 
-sub visitNameInitializer {
+sub visitInitializer {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
 	foreach (@{$node->{list_param}}) {
-		$_->visitName($self);			# parameter
+		$_->visit($self);			# parameter
 	}
 }
 
@@ -109,13 +116,13 @@ sub visitNameInitializer {
 #	3.10	Constant Declaration
 #
 
-sub visitNameConstant {
+sub visitConstant {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameExpression {
+sub visitExpression {
 	# empty
 }
 
@@ -123,14 +130,14 @@ sub visitNameExpression {
 #	3.11	Type Declaration
 #
 
-sub visitNameTypeDeclarator {
+sub visitTypeDeclarator {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	if (exists $node->{modifier}) {		# native IDL2.2
 		$node->{$self->{key}} = $node->{idf};
 	} else {
 		$node->{$self->{key}} = $self->_get_name($node);
-		$self->_get_defn($node->{type})->visitName($self);
+		$self->_get_defn($node->{type})->visit($self);
 	}
 }
 
@@ -140,9 +147,9 @@ sub visitNameTypeDeclarator {
 #	See	1.7		Mapping for Basic Data Types
 #
 
-sub visitNameBasicType {
+sub visitBasicType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $name = $node->{value};
 	$name =~ s/ /_/g;
 	$node->{$self->{key}} = "CORBA_" . $name;
@@ -154,78 +161,71 @@ sub visitNameBasicType {
 #	3.11.2.1	Structures
 #
 
-sub visitNameStructType {
+sub visitStructType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
-	foreach (@{$node->{list_value}}) {
-		$self->_get_defn($_)->visitName($self);		# single or array
+	foreach (@{$node->{list_member}}) {
+		$self->_get_defn($_)->visit($self);		# member
 	}
 }
 
-sub visitNameArray {
+sub visitMember {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
-	$self->_get_defn($node->{type})->visitName($self);
-}
-
-sub visitNameSingle {
-	my $self = shift;
-	my($node) = @_;
-	$node->{$self->{key}} = $node->{idf};
-	$self->_get_defn($node->{type})->visitName($self);
+	$self->_get_defn($node->{type})->visit($self);
 }
 
 #	3.11.2.2	Discriminated Unions
 #
 
-sub visitNameUnionType {
+sub visitUnionType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
-	$self->_get_defn($node->{type})->visitName($self);
+	$self->_get_defn($node->{type})->visit($self);
 	foreach (@{$node->{list_expr}}) {
-		$_->visitName($self);			# case
+		$_->visit($self);			# case
 	}
 }
 
-sub visitNameCase {
+sub visitCase {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_label}}) {
-		$_->visitName($self);			# default or expression
+		$_->visit($self);			# default or expression
 	}
-	$node->{element}->visitName($self);
+	$node->{element}->visit($self);
 }
 
-sub visitNameDefault {
+sub visitDefault {
 	# empty
 }
 
-sub visitNameElement {
+sub visitElement {
 	my $self = shift;
-	my($node) = @_;
-	$self->_get_defn($node->{value})->visitName($self);		# single or array
+	my ($node) = @_;
+	$self->_get_defn($node->{value})->visit($self);		# member
 }
 
 #	3.11.2.4	Enumerations
 #
 
-sub visitNameEnumType {
+sub visitEnumType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = "CORBA_long";
 	foreach (@{$node->{list_expr}}) {
-		$_->visitName($self);			# enum
+		$_->visit($self);			# enum
 	}
 }
 
-sub visitNameEnum {
+sub visitEnum {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
@@ -235,15 +235,15 @@ sub visitNameEnum {
 #	See	1.11	Mapping for Sequence Types
 #
 
-sub visitNameSequenceType {
+sub visitSequenceType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $type = $self->_get_defn($node->{type});
 	while (		$type->isa('TypeDeclarator')
 			and ! exists $type->{array_size} ) {
 		$type = $self->_get_defn($type->{type});
 	}
-	$type->visitName($self);
+	$type->visit($self);
 	my $name = $type->{$self->{key}};
 	$name =~ s/^CORBA_//;
 	$node->{$self->{key}} = "CORBA_sequence_" . $name;
@@ -253,9 +253,9 @@ sub visitNameSequenceType {
 #	See	1.12	Mapping for Strings
 #
 
-sub visitNameStringType {
+sub visitStringType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = "CORBA_string";
 }
 
@@ -263,9 +263,9 @@ sub visitNameStringType {
 #	See	1.13	Mapping for Wide Strings
 #
 
-sub visitNameWideStringType {
+sub visitWideStringType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = "CORBA_wstring";
 }
 
@@ -273,16 +273,16 @@ sub visitNameWideStringType {
 #	See	1.14	Mapping for Fixed
 #
 
-sub visitNameFixedPtType {
+sub visitFixedPtType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $name = "CORBA_fixed_" . $node->{d}->{value} . "_" . $node->{s}->{value};
 	$node->{$self->{key}} = $name;
 }
 
-sub visitNameFixedPtConstType {
+sub visitFixedPtConstType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $name = "CORBA_fixed";
 	$node->{$self->{key}} = $name;
 }
@@ -291,12 +291,12 @@ sub visitNameFixedPtConstType {
 #	3.12	Exception Declaration
 #
 
-sub visitNameException {
+sub visitException {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $self->_get_name($node);
-	foreach (@{$node->{list_value}}) {
-		$self->_get_defn($_)->visitName($self);		# single or array
+	foreach (@{$node->{list_member}}) {
+		$self->_get_defn($_)->visit($self);		# member
 	}
 }
 
@@ -306,26 +306,26 @@ sub visitNameException {
 #	See	1.4		Inheritance and Operation Names
 #
 
-sub visitNameOperation {
+sub visitOperation {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
-	$self->_get_defn($node->{type})->visitName($self);
+	$self->_get_defn($node->{type})->visit($self);
 	foreach (@{$node->{list_param}}) {
-		$_->visitName($self);			# parameter
+		$_->visit($self);			# parameter
 	}
 }
 
-sub visitNameParameter {
+sub visitParameter {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
-	$self->_get_defn($node->{type})->visitName($self);
+	$self->_get_defn($node->{type})->visit($self);
 }
 
-sub visitNameVoidType {
+sub visitVoidType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = "void";
 }
 
@@ -333,69 +333,65 @@ sub visitNameVoidType {
 #	3.14	Attribute Declaration
 #
 
-sub visitNameAttribute {
+sub visitAttribute {
 	my $self = shift;
-	my($node) = @_;
-	$node->{_get}->visitName($self);
-	$node->{_set}->visitName($self) if (exists $node->{_set});
+	my ($node) = @_;
+	$node->{_get}->visit($self);
+	$node->{_set}->visit($self) if (exists $node->{_set});
 }
 
 #
 #	3.15	Repository Identity Related Declarations
 #
 
-sub visitNameTypeId {
+sub visitTypeId {
 	# empty
 }
 
-sub visitNameTypePrefix {
+sub visitTypePrefix {
 	# empty
 }
-
-#
-#	3.16	Event Declaration
-#
 
 #
 #	3.17	Component Declaration
 #
 
-sub visitNameProvides {
+sub visitProvides {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameUses {
+sub visitUses {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNamePublishes {
+sub visitPublishes {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameEmits {
+sub visitEmits {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameConsumes {
+sub visitConsumes {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
@@ -404,23 +400,23 @@ sub visitNameConsumes {
 #	3.18	Home Declaration
 #
 
-sub visitNameFactory {
+sub visitFactory {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
 	foreach (@{$node->{list_param}}) {
-		$_->visitName($self);			# parameter
+		$_->visit($self);			# parameter
 	}
 }
 
-sub visitNameFinder {
+sub visitFinder {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
 	foreach (@{$node->{list_param}}) {
-		$_->visitName($self);			# parameter
+		$_->visit($self);			# parameter
 	}
 }
 

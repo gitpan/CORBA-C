@@ -6,7 +6,7 @@ WriteMakefile(
     'VERSION_FROM'  => 'include.pm',
     'ABSTRACT'      => 'IDL compiler to C include file',
     'PREREQ_PM'     => {
-                        'CORBA::IDL::node'  => 2.00,
+                        'CORBA::IDL::node'  => 2.20,
     },
     'PM'            => {
                         'include.pm'    => '$(INST_LIBDIR)/C/include.pm',

@@ -7,7 +7,7 @@ use UNIVERSAL;
 #			C Language Mapping Specification, New Edition June 1999
 #
 
-package ClengthVisitor;
+package CORBA::C::lengthVisitor;
 
 # builds $node->{length}
 
@@ -16,7 +16,7 @@ sub new {
 	my $class = ref($proto) || $proto;
 	my $self = {};
 	bless($self, $class);
-	my($parser) = @_;
+	my ($parser) = @_;
 	$self->{srcname} = $parser->YYData->{srcname};
 	$self->{symbtab} = $parser->YYData->{symbtab};
 	$self->{done_hash} = {};
@@ -26,7 +26,7 @@ sub new {
 
 sub _get_defn {
 	my $self = shift;
-	my($defn) = @_;
+	my ($defn) = @_;
 	if (ref $defn) {
 		return $defn;
 	} else {
@@ -39,7 +39,7 @@ sub _get_defn {
 
 sub _get_length {
 	my $self = shift;
-	my($type) = @_;
+	my ($type) = @_;
 	if (	   $type->isa('AnyType')
 			or $type->isa('SequenceType')
 			or $type->isa('StringType')
@@ -59,11 +59,11 @@ sub _get_length {
 #	3.5		OMG IDL Specification
 #
 
-sub visitNameSpecification {
+sub visitSpecification {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
 }
 
@@ -71,11 +71,11 @@ sub visitNameSpecification {
 #	3.7		Module Declaration
 #
 
-sub visitNameModules {
+sub visitModules {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
 }
 
@@ -83,35 +83,43 @@ sub visitNameModules {
 #	3.8		Interface Declaration
 #
 
-sub visitNameBaseInterface {
+sub visitBaseInterface {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{length});
 #	$node->{length} = 'variable';
 	# TODO : $self->{done}->{} ???
 	$node->{length} = '';		# void* = CORBA_unsigned_long
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
+}
+
+sub visitForwardBaseInterface {
+	my $self = shift;
+	my ($node) = @_;
+	return if (exists $node->{length});
+#	$node->{length} = 'variable';
+	$node->{length} = '';		# void* = CORBA_unsigned_long
 }
 
 #
 #	3.9		Value Declaration
 #
 
-sub visitNameStateMember {
+sub visitStateMember {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
-	$self->_get_defn($node->{type})->visitName($self);
+	my ($node) = @_;
+	$self->_get_defn($node->{type})->visit($self);
 }
 
-sub visitNameInitializer {
+sub visitInitializer {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_param}}) {
-		$self->_get_defn($_->{type})->visitName($self);
+		$self->_get_defn($_->{type})->visit($self);
 	}
 }
 
@@ -119,16 +127,16 @@ sub visitNameInitializer {
 #	3.10	Constant Declaration
 #
 
-sub visitNameConstant {
+sub visitConstant {
 }
 
 #
 #	3.11	Type Declaration
 #
 
-sub visitNameTypeDeclarator {
+sub visitTypeDeclarator {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{modifier});	# native IDL2.2
 	my $type = $self->_get_defn($node->{type});
 	if (	   $type->isa('TypeDeclarator')
@@ -137,7 +145,7 @@ sub visitNameTypeDeclarator {
 			or $type->isa('EnumType')
 			or $type->isa('SequenceType')
 			or $type->isa('FixedPtType') ) {
-		$type->visitName($self);
+		$type->visit($self);
 	}
 	$node->{length} = $self->_get_length($type);
 }
@@ -146,7 +154,7 @@ sub visitNameTypeDeclarator {
 #	3.11.1	Basic Types
 #
 
-sub visitNameBasicType {
+sub visitBasicType {
 	# fixed length
 }
 
@@ -156,9 +164,9 @@ sub visitNameBasicType {
 #	3.11.2.1	Structures
 #
 
-sub visitNameStructType {
+sub visitStructType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{$self->{key}}});
 	$self->{done_hash}->{$node->{$self->{key}}} = 1;
 	$node->{length} = undef;
@@ -171,7 +179,7 @@ sub visitNameStructType {
 				or $type->isa('StringType')
 				or $type->isa('WideStringType')
 				or $type->isa('FixedPtType') ) {
-			$type->visitName($self);
+			$type->visit($self);
 		}
 		$node->{length} ||= $self->_get_length($type);
 	}
@@ -180,9 +188,9 @@ sub visitNameStructType {
 #	3.11.2.2	Discriminated Unions
 #
 
-sub visitNameUnionType {
+sub visitUnionType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{$self->{key}}});
 	$self->{done_hash}->{$node->{$self->{key}}} = 1;
 	$node->{length} = undef;
@@ -195,20 +203,20 @@ sub visitNameUnionType {
 				or $type->isa('StringType')
 				or $type->isa('WideStringType')
 				or $type->isa('FixedPtType') ) {
-			$type->visitName($self);
+			$type->visit($self);
 		}
 		$node->{length} ||= $self->_get_length($type);
 	}
 	my $type = $self->_get_defn($node->{type});
 	if ($type->isa('EnumType')) {
-		$type->visitName($self);
+		$type->visit($self);
 	}
 }
 
 #	3.11.2.4	Enumerations
 #
 
-sub visitNameEnumType {
+sub visitEnumType {
 	# fixed length
 }
 
@@ -216,9 +224,9 @@ sub visitNameEnumType {
 #	3.11.3	Template Types
 #
 
-sub visitNameSequenceType {
+sub visitSequenceType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{length} = 'variable';
 	my $type = $self->_get_defn($node->{type});
 	if (	   $type->isa('TypeDeclarator')
@@ -228,27 +236,27 @@ sub visitNameSequenceType {
 			or $type->isa('StringType')
 			or $type->isa('WideStringType')
 			or $type->isa('FixedPtType') ) {
-		$type->visitName($self);
+		$type->visit($self);
 	}
 }
 
-sub visitNameStringType {
+sub visitStringType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{length} = 'variable';
 }
 
-sub visitNameWideStringType {
+sub visitWideStringType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{length} = 'variable';
 }
 
-sub visitNameFixedPtType {
+sub visitFixedPtType {
 	# fixed length
 }
 
-sub visitNameFixedPtConstType {
+sub visitFixedPtConstType {
 	# fixed length
 }
 
@@ -256,12 +264,12 @@ sub visitNameFixedPtConstType {
 #	3.12	Exception Declaration
 #
 
-sub visitNameException {
+sub visitException {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{length} = undef;
 	if (exists $node->{list_expr}) {
-		warn __PACKAGE__,"::visitNameException $node->{idf} : empty list_expr.\n"
+		warn __PACKAGE__,"::visitException $node->{idf} : empty list_expr.\n"
 				unless (@{$node->{list_expr}});
 		foreach (@{$node->{list_expr}}) {
 			my $type = $self->_get_defn($_->{type});
@@ -270,7 +278,7 @@ sub visitNameException {
 					or $type->isa('UnionType')
 					or $type->isa('SequenceType')
 					or $type->isa('FixedPtType') ) {
-				$type->visitName($self);
+				$type->visit($self);
 			}
 			$node->{length} ||= $self->_get_length($type);
 		}
@@ -281,17 +289,17 @@ sub visitNameException {
 #	3.13	Operation Declaration
 #
 
-sub visitNameOperation {
+sub visitOperation {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $type = $self->_get_defn($node->{type});
-	$type->visitName($self);
+	$type->visit($self);
 	foreach (@{$node->{list_param}}) {
-		$self->_get_defn($_->{type})->visitName($self);
+		$self->_get_defn($_->{type})->visit($self);
 	}
 }
 
-sub visitNameVoidType {
+sub visitVoidType {
 	# empty
 }
 
@@ -299,22 +307,22 @@ sub visitNameVoidType {
 #	3.14	Attribute Declaration
 #
 
-sub visitNameAttribute {
+sub visitAttribute {
 	my $self = shift;
-	my($node) = @_;
-	$node->{_get}->visitName($self);
-	$node->{_set}->visitName($self) if (exists $node->{_set});
+	my ($node) = @_;
+	$node->{_get}->visit($self);
+	$node->{_set}->visit($self) if (exists $node->{_set});
 }
 
 #
 #	3.15	Repository Identity Related Declarations
 #
 
-sub visitNameTypeId {
+sub visitTypeId {
 	# empty
 }
 
-sub visitNameTypePrefix {
+sub visitTypePrefix {
 	# empty
 }
 
@@ -326,23 +334,23 @@ sub visitNameTypePrefix {
 #	3.17	Component Declaration
 #
 
-sub visitNameProvides {
+sub visitProvides {
 	# empty
 }
 
-sub visitNameUses {
+sub visitUses {
 	# empty
 }
 
-sub visitNamePublishes {
+sub visitPublishes {
 	# empty
 }
 
-sub visitNameEmits {
+sub visitEmits {
 	# empty
 }
 
-sub visitNameConsumes {
+sub visitConsumes {
 	# empty
 }
 
@@ -350,27 +358,27 @@ sub visitNameConsumes {
 #	3.18	Home Declaration
 #
 
-sub visitNameFactory {
+sub visitFactory {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_param}}) {
-		$self->_get_defn($_->{type})->visitName($self);
+		$self->_get_defn($_->{type})->visit($self);
 	}
 }
 
-sub visitNameFinder {
+sub visitFinder {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_param}}) {
-		$self->_get_defn($_->{type})->visitName($self);
+		$self->_get_defn($_->{type})->visit($self);
 	}
 }
 
 ##############################################################################
 
-package CtypeVisitor;
+package CORBA::C::typeVisitor;
 
 # builds $node->{c_arg}
 
@@ -379,7 +387,7 @@ sub new {
 	my $class = ref($proto) || $proto;
 	my $self = {};
 	bless($self, $class);
-	my($parser) = @_;
+	my ($parser) = @_;
 	$self->{srcname} = $parser->YYData->{srcname};
 	$self->{symbtab} = $parser->YYData->{symbtab};
 	return $self;
@@ -400,11 +408,11 @@ sub _get_type {
 #	3.5		OMG IDL Specification
 #
 
-sub visitNameSpecification {
+sub visitSpecification {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
 }
 
@@ -412,11 +420,11 @@ sub visitNameSpecification {
 #	3.7		Module Declaration
 #
 
-sub visitNameModules {
+sub visitModules {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
 }
 
@@ -424,11 +432,11 @@ sub visitNameModules {
 #	3.8		Interface Declaration
 #
 
-sub visitNameBaseInterface {
+sub visitBaseInterface {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visitName($self);
+		$self->{symbtab}->Lookup($_)->visit($self);
 	}
 }
 
@@ -436,17 +444,17 @@ sub visitNameBaseInterface {
 #	3.9		Value Declaration
 #
 
-sub visitNameStateMember {
+sub visitStateMember {
 	# C mapping is aligned with CORBA 2.1
 }
 
-sub visitNameInitializer {
+sub visitInitializer {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_param}}) {	# parameter
 		my $type = $self->_get_type($_->{type});
-		$_->{c_arg} = Cnameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
+		$_->{c_arg} = CORBA::C::nameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
 	}
 }
 
@@ -454,7 +462,7 @@ sub visitNameInitializer {
 #	3.10	Constant Declaration
 #
 
-sub visitNameConstant {
+sub visitConstant {
 	# empty
 }
 
@@ -462,7 +470,7 @@ sub visitNameConstant {
 #	3.11	Type Declaration
 #
 
-sub visitNameTypeDeclarator {
+sub visitTypeDeclarator {
 	# empty
 }
 
@@ -470,15 +478,15 @@ sub visitNameTypeDeclarator {
 #	3.11.2	Constructed Types
 #
 
-sub visitNameStructType {
+sub visitStructType {
 	# empty
 }
 
-sub visitNameUnionType {
+sub visitUnionType {
 	# empty
 }
 
-sub visitNameEnumType {
+sub visitEnumType {
 	# empty
 }
 
@@ -486,7 +494,7 @@ sub visitNameEnumType {
 #	3.12	Exception Declaration
 #
 
-sub visitNameException {
+sub visitException {
 	# empty
 }
 
@@ -494,14 +502,14 @@ sub visitNameException {
 #	3.13	Operation Declaration
 #
 
-sub visitNameOperation {
+sub visitOperation {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $type = $self->_get_type($node->{type});
-	$node->{c_arg} = Cnameattr->NameAttr($self->{symbtab}, $type, '', 'return');
+	$node->{c_arg} = CORBA::C::nameattr->NameAttr($self->{symbtab}, $type, '', 'return');
 	foreach (@{$node->{list_param}}) {	# parameter
 		$type = $self->_get_type($_->{type});
-		$_->{c_arg} = Cnameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
+		$_->{c_arg} = CORBA::C::nameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
 	}
 }
 
@@ -509,22 +517,22 @@ sub visitNameOperation {
 #	3.14	Attribute Declaration
 #
 
-sub visitNameAttribute {
+sub visitAttribute {
 	my $self = shift;
-	my($node) = @_;
-	$node->{_get}->visitName($self);
-	$node->{_set}->visitName($self) if (exists $node->{_set});
+	my ($node) = @_;
+	$node->{_get}->visit($self);
+	$node->{_set}->visit($self) if (exists $node->{_set});
 }
 
 #
 #	3.15	Repository Identity Related Declarations
 #
 
-sub visitNameTypeId {
+sub visitTypeId {
 	# empty
 }
 
-sub visitNameTypePrefix {
+sub visitTypePrefix {
 	# empty
 }
 
@@ -536,23 +544,23 @@ sub visitNameTypePrefix {
 #	3.17	Component Declaration
 #
 
-sub visitNameProvides {
+sub visitProvides {
 	# empty
 }
 
-sub visitNameUses {
+sub visitUses {
 	# empty
 }
 
-sub visitNamePublishes {
+sub visitPublishes {
 	# empty
 }
 
-sub visitNameEmits {
+sub visitEmits {
 	# empty
 }
 
-sub visitNameConsumes {
+sub visitConsumes {
 	# empty
 }
 
@@ -560,29 +568,29 @@ sub visitNameConsumes {
 #	3.18	Home Declaration
 #
 
-sub visitNameFactory {
+sub visitFactory {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_param}}) {	# parameter
 		my $type = $self->_get_type($_->{type});
-		$_->{c_arg} = Cnameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
+		$_->{c_arg} = CORBA::C::nameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
 	}
 }
 
-sub visitNameFinder {
+sub visitFinder {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_param}}) {	# parameter
 		my $type = $self->_get_type($_->{type});
-		$_->{c_arg} = Cnameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
+		$_->{c_arg} = CORBA::C::nameattr->NameAttr($self->{symbtab}, $type, $_->{c_name}, $_->{attr});
 	}
 }
 
 ##############################################################################
 
-package Cnameattr;
+package CORBA::C::nameattr;
 
 #
 #	See	1.21	Summary of Argument/Result Passing
@@ -592,10 +600,12 @@ package Cnameattr;
 
 sub NameAttr {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $class = ref $node;
 	$class = "BasicType" if ($node->isa("BasicType"));
 	$class = "AnyType" if ($node->isa("AnyType"));
+	$class = "BaseInterface" if ($node->isa("BaseInterface"));
+	$class = "ForwardBaseInterface" if ($node->isa("ForwardBaseInterface"));
 	my $func = 'NameAttr' . $class;
 	if($proto->can($func)) {
 		return $proto->$func($symbtab, $node, $v_name, $attr);
@@ -604,9 +614,9 @@ sub NameAttr {
 	}
 }
 
-sub NameAttrRegularInterface {
+sub NameAttrBaseInterface {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " "   . $v_name;
@@ -617,14 +627,13 @@ sub NameAttrRegularInterface {
 	} elsif ( $attr eq 'return' ) {
 		return $t_name;
 	} else {
-		warn __PACKAGE__,"::NameAttrRegularInterface : ERROR_INTERNAL $attr \n";
+		warn __PACKAGE__,"::NameAttrBaseInterface : ERROR_INTERNAL $attr \n";
 	}
 }
 
-sub NameAttrAbstractInterface {
-	# C mapping is aligned with CORBA 2.1
+sub NameAttrForwardBaseInterface {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " "   . $v_name;
@@ -635,85 +644,13 @@ sub NameAttrAbstractInterface {
 	} elsif ( $attr eq 'return' ) {
 		return $t_name;
 	} else {
-		warn __PACKAGE__,"::NameAttrAbstractInterface : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrLocalInterface {
-	# C mapping is aligned with CORBA 2.1
-	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameAttrLocalInterface : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrRegularValue {
-	# C mapping is aligned with CORBA 2.1
-	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrBoxedValue {
-	# C mapping is aligned with CORBA 2.1
-	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrAbstractValue {
-	# C mapping is aligned with CORBA 2.1
-	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
+		warn __PACKAGE__,"::NameAttrBaseInterface : ERROR_INTERNAL $attr \n";
 	}
 }
 
 sub NameAttrTypeDeclarator {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	if (exists $node->{array_size}) {
 		my $t_name = $node->{c_name};
 		if (      $attr eq 'in' ) {
@@ -758,7 +695,7 @@ sub NameAttrTypeDeclarator {
 
 sub NameAttrBasicType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " "   . $v_name;
@@ -775,7 +712,7 @@ sub NameAttrBasicType {
 
 sub NameAttrAnyType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	$node->{length} = 'variable';
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
@@ -793,7 +730,7 @@ sub NameAttrAnyType {
 
 sub NameAttrStructType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " * " . $v_name;
@@ -818,7 +755,7 @@ sub NameAttrStructType {
 
 sub NameAttrUnionType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " * " . $v_name;
@@ -843,7 +780,7 @@ sub NameAttrUnionType {
 
 sub NameAttrEnumType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " "   . $v_name;
@@ -860,7 +797,7 @@ sub NameAttrEnumType {
 
 sub NameAttrSequenceType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " * "  . $v_name;
@@ -877,7 +814,7 @@ sub NameAttrSequenceType {
 
 sub NameAttrStringType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " "   . $v_name;
@@ -894,7 +831,7 @@ sub NameAttrStringType {
 
 sub NameAttrWideStringType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " "   . $v_name;
@@ -911,7 +848,7 @@ sub NameAttrWideStringType {
 
 sub NameAttrFixedPtType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if (      $attr eq 'in' ) {
 		return $t_name . " * "  . $v_name;
@@ -928,7 +865,7 @@ sub NameAttrFixedPtType {
 
 sub NameAttrVoidType {
 	my $proto = shift;
-	my($symbtab, $node, $v_name, $attr) = @_;
+	my ($symbtab, $node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};
 	if ($attr ne 'return') {
 		warn __PACKAGE__,"::NameAttrVoidType : ERROR_INTERNAL \n";

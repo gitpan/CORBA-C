@@ -8,20 +8,24 @@ use POSIX qw(ctime);
 #			C Language Mapping Specification, New Edition June 1999
 #
 
-package CincludeVisitor;
+package CORBA::C;
+
+use vars qw($VERSION);
+$VERSION = '2.20';
+
+package CORBA::C::includeVisitor;
+
+use File::Basename;
 
 # needs $node->{repos_id} (repositoryIdVisitor), $node->{c_name} (CnameVisitor)
 # $node->{c_arg} (CtypeVisitor) and $node->{c_literal} (CliteralVisitor)
-
-use vars qw($VERSION);
-$VERSION = '2.00';
 
 sub new {
 	my $proto = shift;
 	my $class = ref($proto) || $proto;
 	my $self = {};
 	bless($self, $class);
-	my($parser,$incpath) = @_;
+	my ($parser, $incpath) = @_;
 	$self->{incpath} = $incpath || '';
 	$self->{prefix} = '';				# provision for incskel
 	$self->{srcname} = $parser->YYData->{srcname};
@@ -29,10 +33,7 @@ sub new {
 	$self->{srcname_mtime} = $parser->YYData->{srcname_mtime};
 	$self->{symbtab} = $parser->YYData->{symbtab};
 	$self->{inc} = {};
-	my $filename = $self->{srcname};
-	$filename =~ s/^([^\/]+\/)+//;
-	$filename =~ s/\.idl$//i;
-	$filename .= '.h';
+	my $filename = basename($self->{srcname}, ".idl") . ".h";
 	$self->open_stream($filename);
 	$self->{done_hash} = {};
 	$self->{num_key} = 'num_inc_c';
@@ -41,7 +42,7 @@ sub new {
 
 sub open_stream {
 	my $self = shift;
-	my($filename) = @_;
+	my ($filename) = @_;
 	open(OUT, "> $filename")
 			or die "can't open $filename ($!).\n";
 	$self->{out} = \*OUT;
@@ -50,20 +51,18 @@ sub open_stream {
 
 sub _insert_inc {
 	my $self = shift;
-	my($filename) = @_;
+	my ($filename) = @_;
 	my $FH = $self->{out};
 	unless (exists $self->{inc}->{$filename}) {
 		$self->{inc}->{$filename} = 1;
-		$filename =~ s/^([^\/]+\/)+//;
-		$filename =~ s/\.idl$//i;
-		$filename .= '.h';
+		$filename = basename($filename, ".idl") . ".h";
 		print $FH "#include \"",$self->{prefix},$filename,"\"\n";
 	}
 }
 
 sub _no_mapping {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		if (ref($node) =~ /^Forward/) {
@@ -79,7 +78,7 @@ sub _no_mapping {
 
 sub _get_defn {
 	my $self = shift;
-	my($defn) = @_;
+	my ($defn) = @_;
 	if (ref $defn) {
 		return $defn;
 	} else {
@@ -93,7 +92,7 @@ sub _get_defn {
 
 sub visitSpecification {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	print $FH "/* This file was generated (by ",$0,"). DO NOT modify it */\n";
 	print $FH "/* From file : ",$self->{srcname},", ",$self->{srcname_size}," octets, ",POSIX::ctime($self->{srcname_mtime});
@@ -117,7 +116,7 @@ sub visitSpecification {
 
 sub visitModules {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	unless (exists $node->{$self->{num_key}}) {
 		$node->{$self->{num_key}} = 0;
 	}
@@ -128,7 +127,7 @@ sub visitModules {
 
 sub visitModule {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		my $filename = $self->{srcname};	# Pb io_
@@ -163,7 +162,7 @@ sub visitModule {
 
 sub visitRegularInterface {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	$self->{itf} = $node->{c_name};
 	if ($self->{srcname} eq $node->{filename}) {
@@ -207,7 +206,7 @@ sub visitRegularInterface {
 sub visitAbstractInterface {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	$self->{itf} = $node->{c_name};
 	if ($self->{srcname} eq $node->{filename}) {
@@ -237,14 +236,9 @@ sub visitAbstractInterface {
 	}
 }
 
-sub visitLocalInterface {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
 sub visitForwardRegularInterface {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		my $defn = $self->{symbtab}->Lookup($node->{full});
@@ -259,7 +253,7 @@ sub visitForwardRegularInterface {
 sub visitForwardAbstractInterface {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		my $defn = $self->{symbtab}->Lookup($node->{full});
@@ -271,36 +265,12 @@ sub visitForwardAbstractInterface {
 	}
 }
 
-sub visitForwardLocalInterface {
+sub visitBaseInterface {
 	# C mapping is aligned with CORBA 2.1
 	shift->_no_mapping(@_);
 }
 
-#
-#	3.9		Value Declaration
-#
-
-sub visitRegularValue {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitBoxedValue {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitAbstractValue {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitForwardRegularValue {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitForwardAbstractValue {
+sub visitForwardBaseInterface {
 	# C mapping is aligned with CORBA 2.1
 	shift->_no_mapping(@_);
 }
@@ -313,7 +283,7 @@ sub visitForwardAbstractValue {
 
 sub visitConstant {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		print $FH "#define ",$node->{c_name},"\t",$node->{value}->{c_literal},"\n";
@@ -328,7 +298,7 @@ sub visitConstant {
 
 sub visitTypeDeclarators {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_decl}}) {
 		$self->_get_defn($_)->visit($self);
 	}
@@ -336,7 +306,7 @@ sub visitTypeDeclarators {
 
 sub visitTypeDeclarator {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $node->{modifier});	# native IDL2.2
 	my $type = $self->_get_defn($node->{type});
 	if (	   $type->isa('StructType')
@@ -353,7 +323,6 @@ sub visitTypeDeclarator {
 		if (exists $self->{reposit}) {
 			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
 		}
-		my $type = $self->_get_defn($node->{type});
 		if (exists $node->{array_size}) {
 			#
 			#	See	1.15	Mapping for Array
@@ -401,7 +370,7 @@ sub visitTypeDeclarator {
 
 sub visitStructType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{c_name}});
 	$self->{done_hash}->{$node->{c_name}} = 1;
 	foreach (@{$node->{list_expr}}) {
@@ -439,37 +408,32 @@ sub visitStructType {
 
 sub visitMembers {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	my $type = $self->_get_defn($node->{type});
 	print $FH "\t",$type->{c_name};
 	my $first = 1;
-	foreach (@{$node->{list_value}}) {
+	foreach (@{$node->{list_member}}) {
 		if ($first) {
 			$first = 0;
 		} else {
 			print $FH ",";
 		}
-		$self->_get_defn($_)->visit($self);		# single or array
+		$self->_get_defn($_)->visit($self);		# member
 	}
 	print $FH ";\n";
 }
 
-sub visitArray {
+sub visitMember {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	print $FH " ",$node->{c_name};
-	foreach (@{$node->{array_size}}) {
-		print $FH "[",$_->{c_literal},"]";
+	if (exists $node->{array_size}) {
+		foreach (@{$node->{array_size}}) {
+			print $FH "[",$_->{c_literal},"]";
+		}
 	}
-}
-
-sub visitSingle {
-	my $self = shift;
-	my($node) = @_;
-	my $FH = $self->{out};
-	print $FH " ",$node->{c_name};
 }
 
 #	3.11.2.2	Discriminated Unions
@@ -479,7 +443,7 @@ sub visitSingle {
 
 sub visitUnionType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{c_name}});
 	$self->{done_hash}->{$node->{c_name}} = 1;
 	foreach (@{$node->{list_expr}}) {
@@ -524,17 +488,17 @@ sub visitUnionType {
 
 sub visitCase {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{element}->visit($self);
 }
 
 sub visitElement {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	my $type = $self->_get_defn($node->{type});
 	print $FH "\t\t",$type->{c_name};
-		$self->_get_defn($node->{value})->visit($self);		# single or array
+		$self->_get_defn($node->{value})->visit($self);		# member
 		print $FH ";\n";
 }
 
@@ -543,7 +507,7 @@ sub visitElement {
 
 sub visitForwardStructType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		my $defn = $self->{symbtab}->Lookup($node->{full});
@@ -555,7 +519,7 @@ sub visitForwardStructType {
 
 sub visitForwardUnionType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		my $defn = $self->{symbtab}->Lookup($node->{full});
@@ -570,7 +534,7 @@ sub visitForwardUnionType {
 
 sub visitEnumType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{idf}});
 	$self->{done_hash}->{$node->{idf}} = 1;
 	my $FH = $self->{out};
@@ -590,7 +554,7 @@ sub visitEnumType {
 
 sub visitEnum {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	print $FH "#define ",$node->{c_name},"\t",$node->{c_literal},"\n";
 }
@@ -603,7 +567,7 @@ sub visitEnum {
 
 sub visitSequenceType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{c_name}});
 	$self->{done_hash}->{$node->{c_name}} = 1;
 	my $FH = $self->{out};
@@ -639,7 +603,7 @@ sub visitSequenceType {
 
 sub visitStringType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{c_name}});
 	$self->{done_hash}->{$node->{c_name}} = 1;
 	my $FH = $self->{out};
@@ -655,7 +619,7 @@ sub visitStringType {
 
 sub visitWideStringType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	return if (exists $self->{done_hash}->{$node->{c_name}});
 	$self->{done_hash}->{$node->{c_name}} = 1;
 	my $FH = $self->{out};
@@ -671,7 +635,7 @@ sub visitWideStringType {
 
 sub visitFixedPtType {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		print $FH "#ifndef _",$node->{c_name},"_defined\n";
@@ -700,7 +664,7 @@ sub visitFixedPtConstType {
 
 sub visitException {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	if (exists $node->{list_expr}) {
 		warn __PACKAGE__,"::visitException $node->{idf} : empty list_expr.\n"
 				unless (@{$node->{list_expr}});
@@ -746,7 +710,7 @@ sub visitException {
 
 sub visitOperation {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	foreach (@{$node->{list_param}}) {
 		my $type = $self->_get_defn($_->{type});
 		if (	   $type->isa('StringType')
@@ -768,7 +732,7 @@ sub visitOperation {
 
 sub visitParameter {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	my $FH = $self->{out};
 	my $type = $self->_get_defn($node->{type});
 	print $FH "\t",$node->{c_arg},", /* ",$node->{attr};
@@ -782,7 +746,7 @@ sub visitParameter {
 
 sub visitAttribute {
 	my $self = shift;
-	my($node) = @_;
+	my ($node) = @_;
 	$node->{_get}->visit($self);
 	$node->{_set}->visit($self) if (exists $node->{_set});
 }
@@ -799,65 +763,19 @@ sub visitTypePrefix {
 	# empty
 }
 
-#
-#	3.16	Event Declaration
-#
-
-sub visitRegularEvent {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitAbstractEvent {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitForwardRegularEvent {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitForwardAbstractEvent {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-#
-#	3.17	Component Declaration
-#
-
-sub visitComponent {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-sub visitForwardComponent {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
-#
-#	3.18	Home Declaration
-#
-
-sub visitHome {
-	# C mapping is aligned with CORBA 2.1
-	shift->_no_mapping(@_);
-}
-
 ##############################################################################
 
-package CincskelVisitor;
+package CORBA::C::incskelVisitor;
 
-@CincskelVisitor::ISA = qw(CincludeVisitor);
+@CORBA::C::incskelVisitor::ISA = qw(CORBA::C::includeVisitor);
+use File::Basename;
 
 sub new {
 	my $proto = shift;
 	my $class = ref($proto) || $proto;
 	my $self = {};
 	bless($self, $class);
-	my($parser,$incpath,$prefix) = @_;
+	my ($parser, $incpath, $prefix) = @_;
 	$self->{incpath} = $incpath || '';
 	$prefix = "skel_" unless (defined $prefix);
 	$self->{prefix} = $prefix;
@@ -868,14 +786,40 @@ sub new {
 	$self->{inc} = {};
 	$self->{use_define} = 1;
 	$self->{reposit} = 1;
-	my $filename = $self->{srcname};
-	$filename =~ s/^([^\/]+\/)+//;
-	$filename =~ s/\.idl$//i;
-	$filename = $prefix . $filename . '.h';
+	my $filename = $prefix . basename($self->{srcname}, ".idl") . ".h";
 	$self->open_stream($filename);
 	$self->{filename} = $filename;
 	$self->{done_hash} = {};
 	$self->{num_key} = 'num_incskel_c';
+	return $self;
+}
+
+##############################################################################
+
+package CORBA::C::incdefVisitor;
+
+@CORBA::C::incdefVisitor::ISA = qw(CORBA::C::includeVisitor);
+use File::Basename;
+
+sub new {
+	my $proto = shift;
+	my $class = ref($proto) || $proto;
+	my $self = {};
+	bless($self, $class);
+	my ($parser, $incpath) = @_;
+	$self->{incpath} = $incpath || '';
+	$self->{prefix} = '';
+	$self->{srcname} = $parser->YYData->{srcname};
+	$self->{srcname_size} = $parser->YYData->{srcname_size};
+	$self->{srcname_mtime} = $parser->YYData->{srcname_mtime};
+	$self->{symbtab} = $parser->YYData->{symbtab};
+	$self->{inc} = {};
+	$self->{use_define} = 1;
+	$self->{reposit} = 1;
+	my $filename = basename($self->{srcname}, ".idl") . ".h";
+	$self->open_stream($filename);
+	$self->{done_hash} = {};
+	$self->{num_key} = 'num_inc_c';
 	return $self;
 }
 
