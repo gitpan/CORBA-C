@@ -75,6 +75,7 @@ sub visitNameModule {
 sub visitNameInterface {
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 	foreach (@{$node->{list_decl}}) {
 		if (	   $_->isa('Operation')
@@ -105,30 +106,38 @@ sub visitNameForwardInterface {
 #
 
 sub visitNameRegularValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
 sub visitNameBoxedValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
 sub visitNameAbstractValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 }
 
 sub visitNameForwardRegularValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
 	$node->{$self->{key}} = $self->_get_name_fwd($node);
 }
 
 sub visitNameForwardAbstractValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
 	$node->{$self->{key}} = $self->_get_name_fwd($node);
@@ -194,6 +203,7 @@ sub visitNameBasicType {
 sub visitNameStructType {
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 	foreach (@{$node->{list_value}}) {
 		$_->visitName($self);			# single or array
@@ -220,6 +230,7 @@ sub visitNameSingle {
 sub visitNameUnionType {
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 	$node->{type}->visitName($self);
 	foreach (@{$node->{list_expr}}) {
@@ -381,7 +392,10 @@ sub visitNameVoidType {
 #
 
 sub visitNameAttribute {
-	# empty
+	my $self = shift;
+	my($node) = @_;
+	$node->{_get}->visitName($self);
+	$node->{_set}->visitName($self) if (exists $node->{_set});
 }
 
 ##############################################################################
@@ -398,6 +412,7 @@ sub new {
 	my($parser) = @_;
 	$self->{srcname} = $parser->YYData->{srcname};
 	$self->{done_hash} = {};
+	$self->{key} = 'c_name';
 	return $self;
 }
 
@@ -453,6 +468,8 @@ sub visitNameModule {
 sub visitNameInterface {
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{length});
+	$node->{length} = 'variable';
 	foreach (@{$node->{list_decl}}) {
 		if (	   $_->isa('Operation')
 				or $_->isa('Attributes') ) {
@@ -462,7 +479,6 @@ sub visitNameInterface {
 	}
 	if ($self->{srcname} eq $node->{filename}) {
 		foreach (values %{$node->{hash_attribute_operation}}) {
-			next if ($_->isa("Attribute"));
 			$_->visitName($self);			# builds $node->{length}
 		}
 	}
@@ -477,23 +493,23 @@ sub visitNameForwardInterface {
 #
 
 sub visitNameRegularValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameBoxedValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameAbstractValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameForwardRegularValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameForwardAbstractValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 #
@@ -546,13 +562,15 @@ sub visitNameBasicType {
 sub visitNameStructType {
 	my $self = shift;
 	my($node) = @_;
-	return if (exists $self->{done_hash}->{$node->{c_name}});
-	$self->{done_hash}->{$node->{c_name}} = 1;
+	return if (exists $self->{done_hash}->{$node->{$self->{key}}});
+	$self->{done_hash}->{$node->{$self->{key}}} = 1;
 	$node->{length} = undef;
 	foreach (@{$node->{list_expr}}) {
 		if (	   $_->{type}->isa('StructType')
 				or $_->{type}->isa('UnionType')
 				or $_->{type}->isa('SequenceType')
+				or $_->{type}->isa('StringType')
+				or $_->{type}->isa('WideStringType')
 				or $_->{type}->isa('FixedPtType') ) {
 			$_->{type}->visitName($self);
 		}
@@ -566,13 +584,15 @@ sub visitNameStructType {
 sub visitNameUnionType {
 	my $self = shift;
 	my($node) = @_;
-	return if (exists $self->{done_hash}->{$node->{c_name}});
-	$self->{done_hash}->{$node->{c_name}} = 1;
+	return if (exists $self->{done_hash}->{$node->{$self->{key}}});
+	$self->{done_hash}->{$node->{$self->{key}}} = 1;
 	$node->{length} = undef;
 	foreach (@{$node->{list_expr}}) {
 		if (	   $_->{element}->{type}->isa('StructType')
 				or $_->{element}->{type}->isa('UnionType')
 				or $_->{element}->{type}->isa('SequenceType')
+				or $_->{element}->{type}->isa('StringType')
+				or $_->{element}->{type}->isa('WideStringType')
 				or $_->{element}->{type}->isa('FixedPtType') ) {
 			$_->{element}->{type}->visitName($self);
 		}
@@ -671,6 +691,17 @@ sub visitNameOperation {
 	}
 }
 
+#
+#	3.13	Attribute Declaration
+#
+
+sub visitNameAttribute {
+	my $self = shift;
+	my($node) = @_;
+	$node->{_get}->visitName($self);
+	$node->{_set}->visitName($self) if (exists $node->{_set});
+}
+
 ##############################################################################
 
 package CtypeVisitor;
@@ -720,7 +751,6 @@ sub visitNameInterface {
 	my($node) = @_;
 	if ($self->{srcname} eq $node->{filename}) {
 		foreach (values %{$node->{hash_attribute_operation}}) {
-			next if ($_->isa("Attribute"));
 			$_->visitName($self);			# builds $node->{c_arg}
 		}
 	}
@@ -737,6 +767,17 @@ sub visitNameOperation {
 	foreach (@{$node->{list_param}}) {	# parameter
 		$_->{c_arg} = Cnameattr->NameAttr($_->{type},$_->{c_name},$_->{attr});
 	}
+}
+
+#
+#	3.13	Attribute Declaration
+#
+
+sub visitNameAttribute {
+	my $self = shift;
+	my($node) = @_;
+	$node->{_get}->visitName($self);
+	$node->{_set}->visitName($self) if (exists $node->{_set});
 }
 
 ##############################################################################
@@ -760,6 +801,60 @@ sub NameAttr {
 }
 
 sub NameAttrInterface {
+	my $proto = shift;
+	my($node, $v_name, $attr) = @_;
+	my $t_name = $node->{c_name};
+	if (      $attr eq 'in' ) {
+		return $t_name . " "   . $v_name;
+	} elsif ( $attr eq 'inout' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'out' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'return' ) {
+		return $t_name;
+	} else {
+		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
+	}
+}
+
+sub NameAttrRegularValue {
+	# C mapping is aligned with CORBA 2.1
+	my $proto = shift;
+	my($node, $v_name, $attr) = @_;
+	my $t_name = $node->{c_name};
+	if (      $attr eq 'in' ) {
+		return $t_name . " "   . $v_name;
+	} elsif ( $attr eq 'inout' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'out' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'return' ) {
+		return $t_name;
+	} else {
+		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
+	}
+}
+
+sub NameAttrBoxedValue {
+	# C mapping is aligned with CORBA 2.1
+	my $proto = shift;
+	my($node, $v_name, $attr) = @_;
+	my $t_name = $node->{c_name};
+	if (      $attr eq 'in' ) {
+		return $t_name . " "   . $v_name;
+	} elsif ( $attr eq 'inout' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'out' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'return' ) {
+		return $t_name;
+	} else {
+		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
+	}
+}
+
+sub NameAttrAbstractValue {
+	# C mapping is aligned with CORBA 2.1
 	my $proto = shift;
 	my($node, $v_name, $attr) = @_;
 	my $t_name = $node->{c_name};

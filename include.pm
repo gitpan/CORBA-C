@@ -14,7 +14,7 @@ package CincludeVisitor;
 # $node->{c_arg} (CtypeVisitor) and $node->{c_literal} (CliteralVisitor)
 
 use vars qw($VERSION);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 sub new {
 	my $proto = shift;
@@ -44,6 +44,7 @@ sub open_stream {
 	open(OUT, "> $filename")
 			or die "can't open $filename ($!).\n";
 	$self->{out} = \*OUT;
+	$self->{filename} = $filename;
 }
 
 sub _insert_inc {
@@ -68,8 +69,9 @@ sub visitSpecification {
 	my($node) = @_;
 	my $FH = $self->{out};
 	print $FH "/* This file is generated. DO NOT modify it */\n";
-	print $FH "// From file : ",$self->{srcname},", ",$self->{srcname_size}," octets, ",POSIX::ctime($self->{srcname_mtime});
-	print $FH "// Generation date : ",POSIX::ctime(time());
+	print $FH "/* From file : ",$self->{srcname},", ",$self->{srcname_size}," octets, ",POSIX::ctime($self->{srcname_mtime});
+	print $FH " * Generation date : ",POSIX::ctime(time());
+	print $FH " */\n";
 	print $FH "\n";
 	print $FH "#include <",$self->{incpath},"corba.h>\n";
 #	print $FH "#include \"corba.h\"\n";
@@ -78,7 +80,7 @@ sub visitSpecification {
 		$_->visit($self);
 	}
 	print $FH "\n";
-	print $FH "/* End Of File : ",$self->{filename}," */\n";
+	print $FH "/* end of file : ",$self->{filename}," */\n";
 	close $FH;
 }
 
@@ -91,18 +93,18 @@ sub visitModule {
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "#ifndef _",$self->{prefix},$node->{c_name},"_defined\n";
-		print $FH "#define _",$self->{prefix},$node->{c_name},"_defined\n";
 		print $FH "/*\n";
 		print $FH " * begin of module ",$node->{idf},"\n";
 		print $FH " */\n";
+		print $FH "#ifndef _",$self->{prefix},$node->{c_name},"_defined\n";
+		print $FH "#define _",$self->{prefix},$node->{c_name},"_defined\n";
 		foreach (@{$node->{list_decl}}) {
 			$_->visit($self);
 		}
+		print $FH "#endif\n";
 		print $FH "/*\n";
 		print $FH " * end of module ",$node->{c_name},"\n";
 		print $FH " */\n";
-		print $FH "#endif\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
@@ -121,11 +123,12 @@ sub visitInterface {
 	$self->{itf} = $node->{c_name};
 	if ($self->{srcname} eq $node->{filename}) {
 #		return if (exists $node->{modifier});	# abstract or local
-		print $FH "#ifndef _",$self->{prefix},$node->{c_name},"_defined\n";
-		print $FH "#define _",$self->{prefix},$node->{c_name},"_defined\n";
 		print $FH "/*\n";
 		print $FH " * begin of interface ",$node->{c_name},"\n";
 		print $FH " */\n";
+		print $FH "#ifndef _",$self->{prefix},$node->{c_name},"_defined\n";
+		print $FH "#define _",$self->{prefix},$node->{c_name},"_defined\n";
+		print $FH "\n";
 		print $FH "typedef CORBA_Object ",$node->{c_name},";\n";
 		print $FH "\n";
 		foreach (@{$node->{list_decl}}) {
@@ -138,21 +141,18 @@ sub visitInterface {
 		print $FH "#endif\n";
 		print $FH "\n";
 		return if (exists $node->{modifier});	# abstract or local
-		print $FH "#ifndef _proto_",$self->{prefix},$node->{c_name},"_defined\n";
-		print $FH "#define _proto_",$self->{prefix},$node->{c_name},"_defined\n";
-		print $FH "\n";
 		if (keys %{$node->{hash_attribute_operation}}) {
-			print $FH "\t\t/*-- prototypes --*/\n";
+			print $FH "#ifndef _proto_",$self->{prefix},$node->{c_name},"_defined\n";
+			print $FH "#define _proto_",$self->{prefix},$node->{c_name},"_defined\n";
 			print $FH "\n";
 			foreach (values %{$node->{hash_attribute_operation}}) {
-				next if ($_->isa("Attribute"));
 				$_->visit($self);
 			}
-			print $FH "/*\n";
+			print $FH "#endif\n";
 		}
+		print $FH "/*\n";
 		print $FH " * end of interface ",$node->{c_name},"\n";
 		print $FH " */\n";
-		print $FH "#endif\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
@@ -176,71 +176,72 @@ sub visitForwardInterface {
 #
 #	3.8		Value Declaration
 #
-#	3.8.1	Regular Value Type
-#
 
 sub visitRegularValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "/* regular value ",$node->{c_name}," */\n";
+		print $FH "\n";
+		print $FH "/* no mapping for ",$node->{c_name},"*/\n";
+		print $FH "\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
 }
-
-#
-#	3.8.2	Boxed Value Type
-#
 
 sub visitBoxedValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "/* boxed value ",$node->{c_name}," */\n";
+		print $FH "\n";
+		print $FH "/* no mapping for ",$node->{c_name},"*/\n";
+		print $FH "\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
 }
-
-#
-#	3.8.3	Abstract Value Type
-#
 
 sub visitAbstractValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "/* abstract value ",$node->{c_name}," */\n";
+		print $FH "\n";
+		print $FH "/* no mapping for ",$node->{c_name},"*/\n";
+		print $FH "\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
 }
 
-#
-#	3.8.4	Value Forward Declaration
-#
-
 sub visitForwardRegularValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "/* forward regular value ",$node->{c_name}," */\n";
+		print $FH "\n";
+		print $FH "/* no mapping for ",$node->{c_name},"*/\n";
+		print $FH "\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
 }
 
 sub visitForwardAbstractValue {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "/* forward abstract value ",$node->{c_name}," */\n";
+		print $FH "\n";
+		print $FH "/* no mapping for ",$node->{c_name},"*/\n";
+		print $FH "\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
@@ -257,19 +258,10 @@ sub visitConstant {
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "#define ",$node->{c_name},"\t";
-			$node->{value}->visit($self);	# expression
-			print $FH "\n";
+		print $FH "#define ",$node->{c_name},"\t",$node->{value}->{c_literal},"\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
-}
-
-sub visitExpression {
-	my $self = shift;
-	my($node) = @_;
-	my $FH = $self->{out};
-	print $FH $node->{c_literal};
 }
 
 #
@@ -309,9 +301,7 @@ sub visitTypeDeclarator {
 					$node->{type}->{c_name},
 					" ",$node->{c_name};
 			foreach (@{$node->{array_size}}) {
-				print $FH "[";
-				$_->visit($self);				# expression
-				print $FH "]";
+				print $FH "[",$_->{c_literal},"]";
 			}
 			print $FH ";\n";
 			my @list = @{$node->{array_size}};
@@ -320,9 +310,7 @@ sub visitTypeDeclarator {
 					$node->{type}->{c_name},
 					" ",$node->{c_name},"_slice";
 			foreach (@list) {
-				print $FH "[";
-				$_->visit($self);				# expression
-				print $FH "]";
+				print $FH "[",$_->{c_literal},"]";
 			}
 			print $FH ";\n";
 			if (defined $node->{type}->{length}) {
@@ -405,9 +393,7 @@ sub visitArray {
 	my $FH = $self->{out};
 	print $FH " ",$node->{c_name};
 	foreach (@{$node->{array_size}}) {
-		print $FH "[";
-		$_->visit($self);				# expression
-		print $FH "]";
+		print $FH "[",$_->{c_literal},"]";
 	}
 }
 
@@ -444,7 +430,7 @@ sub visitUnionType {
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		print $FH "typedef struct {\n";
-		print $FH "\t",$node->{type}->{c_name}," _d; // discriminator\n";
+		print $FH "\t",$node->{type}->{c_name}," _d; /* discriminator */\n";
 		print $FH "\tunion {\n";
 		foreach (@{$node->{list_expr}}) {
 			$_->visit($self);				# case
@@ -484,8 +470,8 @@ sub visitElement {
 sub visitEnumType {
 	my $self = shift;
 	my($node) = @_;
-	return if (exists $self->{done_hash}->{$node->{c_name}});
-	$self->{done_hash}->{$node->{c_name}} = 1;
+	return if (exists $self->{done_hash}->{$node->{idf}});
+	$self->{done_hash}->{$node->{idf}} = 1;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		print $FH "/* enum ",$node->{idf}," */\n";
@@ -514,7 +500,7 @@ sub visitForwardStructType {
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "typedef $node->{c_name};\n";
+		print $FH "typedef ",$node->{c_name},";\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
@@ -525,7 +511,7 @@ sub visitForwardUnionType {
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "typedef $node->{c_name};\n";
+		print $FH "typedef ",$node->{c_name},";\n";
 	} else {
 		$self->_insert_inc($node->{filename});
 	}
@@ -701,9 +687,20 @@ sub visitParameter {
 	my $self = shift;
 	my($node) = @_;
 	my $FH = $self->{out};
-	print $FH "\t",$node->{c_arg},", // ",$node->{attr};
-		print $FH " (variable length)\n" if (defined $node->{type}->{length});
-		print $FH " (fixed length)\n" unless (defined $node->{type}->{length});
+	print $FH "\t",$node->{c_arg},", /* ",$node->{attr};
+		print $FH " (variable length) */\n" if (defined $node->{type}->{length});
+		print $FH " (fixed length) */\n" unless (defined $node->{type}->{length});
+}
+
+#
+#	3.13	Attribute Declaration
+#
+
+sub visitAttribute {
+	my $self = shift;
+	my($node) = @_;
+	$node->{_get}->visit($self);
+	$node->{_set}->visit($self) if (exists $node->{_set});
 }
 
 ##############################################################################

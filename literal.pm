@@ -1,6 +1,12 @@
 use strict;
 use UNIVERSAL;
 
+#
+#			Interface Definition Language (OMG IDL CORBA v2.4)
+#
+#			C Language Mapping Specification, New Edition June 1999
+#
+
 package CliteralVisitor;
 
 # needs $node->{c_name} (CnameVisitor) for Enum
@@ -46,6 +52,8 @@ sub visitNameModule {
 sub visitNameInterface {
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = 1;
 	foreach (@{$node->{list_decl}}) {
 		$_->visitName($self);
 	}
@@ -60,23 +68,23 @@ sub visitNameForwardInterface {
 #
 
 sub visitNameRegularValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameBoxedValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameAbstractValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameForwardRegularValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 sub visitNameForwardAbstractValue {
-	# empty
+	# C mapping is aligned with CORBA 2.1
 }
 
 #
@@ -213,10 +221,10 @@ sub visitNameWideCharacterLiteral {
 sub visitNameFixedPtLiteral {
 	my $self = shift;
 	my($node) = @_;
-	my $str = "{";
-	$str .= $node->{d}->{value} . "u, ";
-	$str .= $node->{s}->{value};
-	$str .= "}";
+	my $type = $node->{type};
+	my $str = "\"";
+	$str .= $node->{value};
+	$str .= "\"";
 	$node->{$self->{key}} = $str;
 }
 
@@ -281,6 +289,8 @@ sub visitNameAnyType {
 sub visitNameStructType {
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = 1;
 	foreach (@{$node->{list_value}}) {
 		$_->visitName($self);				# single or array
 	}
@@ -307,6 +317,8 @@ sub visitNameSingle {
 sub visitNameUnionType {
 	my $self = shift;
 	my($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = 1;
 	$node->{type}->visitName($self);
 	foreach (@{$node->{list_expr}}) {
 		$_->visitName($self);				# case
