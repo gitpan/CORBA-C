@@ -1,7 +1,7 @@
 include.pm
 literal.pm
 name.pm
-idl2c
+idl2c.pl
 Changes
 MANIFEST
 Makefile.PL

@@ -1,5 +1,7 @@
 Revision history for Perl extension CORBA::C.
 
+1.04  Tue Sep 17 08:30:00 2002
+
 1.03  Tue May 21 09:30:00 2002
 	- bug when reopen a module
 

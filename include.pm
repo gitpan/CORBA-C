@@ -14,7 +14,7 @@ package CincludeVisitor;
 # $node->{c_arg} (CtypeVisitor) and $node->{c_literal} (CliteralVisitor)
 
 use vars qw($VERSION);
-$VERSION = '1.03';
+$VERSION = '1.04';
 
 sub new {
 	my $proto = shift;
@@ -33,7 +33,6 @@ sub new {
 	$filename =~ s/\.idl$//i;
 	$filename .= '.h';
 	$self->open_stream($filename);
-	$self->{filename} = $filename;
 	$self->{done_hash} = {};
 	return $self;
 }
@@ -93,12 +92,18 @@ sub visitModule {
 	my($node) = @_;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
+		my $filename = $self->{filename};
+		$filename =~ s/\./_/;
 		print $FH "/*\n";
 		print $FH " * begin of module ",$node->{idf},"\n";
 		print $FH " */\n";
+		print $FH "#ifndef _",$self->{prefix},$node->{c_name},"_",$filename,"_defined\n";
+		print $FH "#define _",$self->{prefix},$node->{c_name},"_",$filename,"_defined\n";
+		print $FH "\n";
 		foreach (@{$node->{list_decl}}) {
 			$_->visit($self);
 		}
+		print $FH "#endif\n";
 		print $FH "/*\n";
 		print $FH " * end of module ",$node->{c_name},"\n";
 		print $FH " */\n";
@@ -288,6 +293,9 @@ sub visitTypeDeclarator {
 	}
 	if ($self->{srcname} eq $node->{filename}) {
 		my $FH = $self->{out};
+		if (exists $self->{reposit}) {
+			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+		}
 		if (exists $node->{array_size}) {
 			#
 			#	See	1.15	Mapping for Array
@@ -350,6 +358,9 @@ sub visitStructType {
 	}
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
+		if (exists $self->{reposit}) {
+			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+		}
 		print $FH "typedef struct {\n";
 		foreach (@{$node->{list_expr}}) {
 			$_->visit($self);				# members
@@ -426,6 +437,9 @@ sub visitUnionType {
 	}
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
+		if (exists $self->{reposit}) {
+			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+		}
 		print $FH "typedef struct {\n";
 		print $FH "\t",$node->{type}->{c_name}," _d; /* discriminator */\n";
 		print $FH "\tunion {\n";
@@ -472,6 +486,9 @@ sub visitEnumType {
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		print $FH "/* enum ",$node->{idf}," */\n";
+		if (exists $self->{reposit}) {
+			print $FH "#define id_",$node->{idf}," \"",$node->{repos_id},"\"\n";
+		}
 		foreach (@{$node->{list_expr}}) {
 			$_->visit($self);				# enum
 		}
@@ -720,6 +737,7 @@ sub new {
 	$self->{srcname_mtime} = $parser->YYData->{srcname_mtime};
 	$self->{inc} = {};
 	$self->{use_define} = 1;
+	$self->{reposit} = 1;
 	my $filename = $self->{srcname};
 	$filename =~ s/^([^\/]+\/)+//;
 	$filename =~ s/\.idl$//i;

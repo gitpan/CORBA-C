@@ -91,7 +91,7 @@ C Language Mapping are available on E<lt>http://www.omg.org/E<gt>.
 
 =head1 SEE ALSO
 
-cpp, perl
+cpp
 
 =head1 COPYRIGHT
 
@@ -102,7 +102,7 @@ under the terms of the Artistic Licence.
 
 =head1 AUTHOR
 
-Francois PERRAD E<lt>perrad@besancon.sema.slb.comE<gt>
+Francois PERRAD, francois.perrad@gadz.org
 
 =cut
 
