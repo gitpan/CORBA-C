@@ -14,7 +14,7 @@ package CincludeVisitor;
 # $node->{c_arg} (CtypeVisitor) and $node->{c_literal} (CliteralVisitor)
 
 use vars qw($VERSION);
-$VERSION = '1.0';
+$VERSION = '1.01';
 
 sub new {
 	my $proto = shift;

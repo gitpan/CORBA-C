@@ -611,6 +611,8 @@ sub visitNameSequenceType {
 	my($node) = @_;
 	$node->{length} = 'variable';
 	if (	   $node->{type}->isa('SequenceType')
+			or $node->{type}->isa('StringType')
+			or $node->{type}->isa('WideStringType')
 			or $node->{type}->isa('FixedPtType') ) {
 		$node->{type}->visitName($self);
 	}
