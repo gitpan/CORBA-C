@@ -11,7 +11,7 @@ use POSIX qw(ctime);
 package CORBA::C::include;
 
 use vars qw($VERSION);
-$VERSION = '2.21';
+$VERSION = '2.40';
 
 package CORBA::C::includeVisitor;
 
@@ -96,7 +96,6 @@ sub visitSpecification {
 	my $FH = $self->{out};
 	print $FH "/* This file was generated (by ",$0,"). DO NOT modify it */\n";
 	print $FH "/* From file : ",$self->{srcname},", ",$self->{srcname_size}," octets, ",POSIX::ctime($self->{srcname_mtime});
-	print $FH " * Generation date : ",POSIX::ctime(time());
 	print $FH " */\n";
 	print $FH "\n";
 	print $FH "#include <",$self->{incpath},"corba.h>\n";
@@ -307,7 +306,6 @@ sub visitTypeDeclarators {
 sub visitTypeDeclarator {
 	my $self = shift;
 	my ($node) = @_;
-	return if (exists $node->{modifier});	# native IDL2.2
 	my $type = $self->_get_defn($node->{type});
 	if (	   $type->isa('StructType')
 			or $type->isa('UnionType')
@@ -358,6 +356,10 @@ sub visitTypeDeclarator {
 					" ",$node->{c_name},";\n";
 		}
 	}
+}
+
+sub visitNativeType {
+	# empty
 }
 
 #

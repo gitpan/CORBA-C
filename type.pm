@@ -137,7 +137,6 @@ sub visitConstant {
 sub visitTypeDeclarator {
 	my $self = shift;
 	my ($node) = @_;
-	return if (exists $node->{modifier});	# native IDL2.2
 	my $type = $self->_get_defn($node->{type});
 	if (	   $type->isa('TypeDeclarator')
 			or $type->isa('StructType')
@@ -148,6 +147,10 @@ sub visitTypeDeclarator {
 		$type->visit($self);
 	}
 	$node->{length} = $self->_get_length($type);
+}
+
+sub visitNativeType {
+	# C mapping is aligned with CORBA 2.1
 }
 
 #
@@ -474,6 +477,10 @@ sub visitTypeDeclarator {
 	# empty
 }
 
+sub visitNativeType {
+	# C mapping is aligned with CORBA 2.1
+}
+
 #
 #	3.11.2	Constructed Types
 #
@@ -669,27 +676,29 @@ sub NameAttrTypeDeclarator {
 			warn __PACKAGE__,"::NameAttrTypeDeclarator array : ERROR_INTERNAL $attr \n";
 		}
 	} else {
-		if (exists $node->{modifier}) {		# native
-			# C mapping is aligned with CORBA 2.1
-			my $t_name = $node->{c_name};
-			if (      $attr eq 'in' ) {
-				return $t_name . " "   . $v_name;
-			} elsif ( $attr eq 'inout' ) {
-				return $t_name . " * " . $v_name;
-			} elsif ( $attr eq 'out' ) {
-				return $t_name . " * " . $v_name;
-			} elsif ( $attr eq 'return' ) {
-				return $t_name;
-			} else {
-				warn __PACKAGE__,"::NameAttrTypeDeclarator : ERROR_INTERNAL $attr \n";
-			}
-		} else {
 			my $type = $node->{type};
-			unless (ref $type) {
-				$type = $symbtab->Lookup($type);
-			}
-			return $proto->NameAttr($symbtab, $type, $v_name, $attr);
+		unless (ref $type) {
+			$type = $symbtab->Lookup($type);
 		}
+		return $proto->NameAttr($symbtab, $type, $v_name, $attr);
+	}
+}
+
+sub NameAttrNativeType {
+	my $proto = shift;
+	my ($symbtab, $node, $v_name, $attr) = @_;
+	# C mapping is aligned with CORBA 2.1
+	my $t_name = $node->{c_name};
+	if (      $attr eq 'in' ) {
+		return $t_name . " "   . $v_name;
+	} elsif ( $attr eq 'inout' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'out' ) {
+		return $t_name . " * " . $v_name;
+	} elsif ( $attr eq 'return' ) {
+		return $t_name;
+	} else {
+		warn __PACKAGE__,"::NameAttrNativeType : ERROR_INTERNAL $attr \n";
 	}
 }
 

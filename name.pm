@@ -133,12 +133,14 @@ sub visitExpression {
 sub visitTypeDeclarator {
 	my $self = shift;
 	my ($node) = @_;
-	if (exists $node->{modifier}) {		# native IDL2.2
-		$node->{$self->{key}} = $node->{idf};
-	} else {
-		$node->{$self->{key}} = $self->_get_name($node);
-		$self->_get_defn($node->{type})->visit($self);
-	}
+	$node->{$self->{key}} = $self->_get_name($node);
+	$self->_get_defn($node->{type})->visit($self);
+}
+
+sub visitNativeType {
+	my $self = shift;
+	my ($node) = @_;
+	$node->{$self->{key}} = $node->{idf};
 }
 
 #
