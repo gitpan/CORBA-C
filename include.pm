@@ -14,7 +14,7 @@ package CincludeVisitor;
 # $node->{c_arg} (CtypeVisitor) and $node->{c_literal} (CliteralVisitor)
 
 use vars qw($VERSION);
-$VERSION = '1.02';
+$VERSION = '1.03';
 
 sub new {
 	my $proto = shift;
@@ -96,12 +96,9 @@ sub visitModule {
 		print $FH "/*\n";
 		print $FH " * begin of module ",$node->{idf},"\n";
 		print $FH " */\n";
-		print $FH "#ifndef _",$self->{prefix},$node->{c_name},"_defined\n";
-		print $FH "#define _",$self->{prefix},$node->{c_name},"_defined\n";
 		foreach (@{$node->{list_decl}}) {
 			$_->visit($self);
 		}
-		print $FH "#endif\n";
 		print $FH "/*\n";
 		print $FH " * end of module ",$node->{c_name},"\n";
 		print $FH " */\n";
