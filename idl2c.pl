@@ -1,42 +1,64 @@
 #!/usr/bin/perl -w
 
 use strict;
-use CORBA::IDL::parser24;
+use CORBA::IDL::parser30;
 use CORBA::IDL::symbtab;
 # visitors
 use CORBA::IDL::repos_id;
 use CORBA::C::literal;
 use CORBA::C::name;
+use CORBA::C::type;
 use CORBA::C::include;
 
 my $parser = new Parser;
-$parser->YYData->{IDL_version} = '2.4';		# '2.0', '2.1', '2.2', '2.3', '2.4'
 $parser->YYData->{verbose_error} = 1;		# 0, 1
 $parser->YYData->{verbose_warning} = 1;		# 0, 1
 $parser->YYData->{verbose_info} = 1;		# 0, 1
-$parser->YYData->{verbose_deprecated} = 1;	# 0, 1 (concerns only version '2.4')
+$parser->YYData->{verbose_deprecated} = 1;	# 0, 1 (concerns only version '2.4' and upper)
 $parser->YYData->{symbtab} = new Symbtab($parser);
-if ($^O eq 'MSWin32') {
-	$parser->YYData->{preprocessor} = 'cpp -C -D__idl2c';
-#	$parser->YYData->{preprocessor} = 'CL /E /C /nologo /D__idl2c';	# Microsoft VC
-} else {
-	$parser->YYData->{preprocessor} = 'cpp -C -D__idl2c';
+my $cflags = '-D__idl2c';
+if ($Parser::IDL_version lt '3.0') {
+	$cflags .= ' -D_PRE_3_0_COMPILER_';
 }
+# preprocessor must preserve comments
+if ($^O eq 'MSWin32') {
+	$parser->YYData->{preprocessor} = 'cpp -C ' . $cflags;
+#	$parser->YYData->{preprocessor} = 'CL /E /C /nologo ' . $cflags;	# Microsoft VC
+} else {
+	$parser->YYData->{preprocessor} = 'cpp -C ' . $cflags;
+}
+$parser->getopts("i:x");
 $parser->Run(@ARGV);
 $parser->YYData->{symbtab}->CheckForward();
+$parser->YYData->{symbtab}->CheckRepositoryID();
 
 if (exists $parser->YYData->{nb_error}) {
 	my $nb = $parser->YYData->{nb_error};
 	print "$nb error(s).\n"
 }
-if (exists $parser->YYData->{nb_warning}) {
+if (        $parser->YYData->{verbose_warning}
+		and exists $parser->YYData->{nb_warning} ) {
 	my $nb = $parser->YYData->{nb_warning};
 	print "$nb warning(s).\n"
 }
+if (        $parser->YYData->{verbose_info}
+		and exists $parser->YYData->{nb_info} ) {
+	my $nb = $parser->YYData->{nb_info};
+	print "$nb info(s).\n"
+}
+if (        $parser->YYData->{verbose_deprecated}
+		and exists $parser->YYData->{nb_deprecated} ) {
+	my $nb = $parser->YYData->{nb_deprecated};
+	print "$nb deprecated(s).\n"
+}
 
-if (		exists $parser->YYData->{root}
+if (        exists $parser->YYData->{root}
 		and ! exists $parser->YYData->{nb_error} ) {
 	$parser->YYData->{root}->visitName(new repositoryIdVisitor($parser));
+	if (        $Parser::IDL_version ge '3.0'
+			and $parser->YYData->{opt_x} ) {
+		$parser->YYData->{symbtab}->Export();
+	}
 	$parser->YYData->{root}->visitName(new CnameVisitor($parser));
 	$parser->YYData->{root}->visitName(new CliteralVisitor($parser));
 	$parser->YYData->{root}->visitName(new ClengthVisitor($parser));
@@ -56,7 +78,7 @@ idl2c [options] I<spec>.idl
 
 =head1 OPTIONS
 
-All options are forwarded to C preprocessor.
+All options are forwarded to C preprocessor, except -i -x.
 
 With the GNU C Compatible Compiler Processor, useful options are :
 
@@ -71,6 +93,20 @@ With the GNU C Compatible Compiler Processor, useful options are :
 =item B<-I->
 
 =item B<-nostdinc>
+
+=back
+
+Specific options :
+
+=over 8
+
+=item B<-i> I<directory>
+
+Specify a path for import (only for version 3.0).
+
+=item B<-x>
+
+Enable export (only for version 3.0).
 
 =back
 
@@ -91,13 +127,13 @@ C Language Mapping are available on E<lt>http://www.omg.org/E<gt>.
 
 =head1 SEE ALSO
 
-cpp
+cpp, perl
 
 =head1 COPYRIGHT
 
-(c) 2001-2002 Francois PERRAD, France. All rights reserved.
+(c) 2001-2003 Francois PERRAD, France. All rights reserved.
 
-This program and all CORBA::C modules are distributed
+This program and all CORBA::IDL modules are distributed
 under the terms of the Artistic Licence.
 
 =head1 AUTHOR

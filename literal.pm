@@ -2,7 +2,7 @@ use strict;
 use UNIVERSAL;
 
 #
-#			Interface Definition Language (OMG IDL CORBA v2.4)
+#			Interface Definition Language (OMG IDL CORBA v3.0)
 #
 #			C Language Mapping Specification, New Edition June 1999
 #
@@ -16,9 +16,22 @@ sub new {
 	my $proto = shift;
 	my $class = ref($proto) || $proto;
 	my $self = {};
-	$self->{key} = 'c_literal';
 	bless($self, $class);
+	my($parser) = @_;
+	$self->{key} = 'c_literal';
+	$self->{symbtab} = $parser->YYData->{symbtab};
 	return $self;
+}
+
+sub visitNameType {
+	my $self = shift;
+	my ($type) = @_;
+
+	if (ref $type) {
+		$type->visitName($self);
+	} else {
+		$self->{symbtab}->Lookup($type)->visitName($self);
+	}
 }
 
 #
@@ -28,67 +41,64 @@ sub new {
 sub visitNameSpecification {
 	my $self = shift;
 	my($node) = @_;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self);
+	foreach (@{$node->{list_export}}) {
+		$self->{symbtab}->Lookup($_)->visitName($self);
 	}
 }
 
 #
-#	3.6		Module Declaration
+#	3.7		Module Declaration
 #
 
-sub visitNameModule {
+sub visitNameModules {
 	my $self = shift;
 	my($node) = @_;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self);
+	foreach (@{$node->{list_export}}) {
+		$self->{symbtab}->Lookup($_)->visitName($self);
 	}
 }
 
 #
-#	3.7		Interface Declaration
+#	3.8		Interface Declaration
 #
 
-sub visitNameInterface {
+sub visitNameBaseInterface {
 	my $self = shift;
 	my($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = 1;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self);
+	foreach (@{$node->{list_export}}) {
+		$self->{symbtab}->Lookup($_)->visitName($self);
 	}
 }
 
-sub visitNameForwardInterface {
-	# empty
+#
+#	3.9		Value Declaration
+#
+
+sub visitNameStateMember {
+	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	$self->visitNameType($node->{type});	# type_spec
+	if (exists $node->{array_size}) {
+		foreach (@{$node->{array_size}}) {
+			$_->visitName($self);			# expression
+		}
+	}
+}
+
+sub visitNameInitializer {
+	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	foreach (@{$node->{list_param}}) {
+		$_->visitName($self);				# parameter
+	}
 }
 
 #
-#	3.8		Value Declaration
-#
-
-sub visitNameRegularValue {
-	# C mapping is aligned with CORBA 2.1
-}
-
-sub visitNameBoxedValue {
-	# C mapping is aligned with CORBA 2.1
-}
-
-sub visitNameAbstractValue {
-	# C mapping is aligned with CORBA 2.1
-}
-
-sub visitNameForwardRegularValue {
-	# C mapping is aligned with CORBA 2.1
-}
-
-sub visitNameForwardAbstractValue {
-	# C mapping is aligned with CORBA 2.1
-}
-
-#
-#	3.9		Constant Declaration
+#	3.10	Constant Declaration
 #
 
 sub visitNameConstant {
@@ -99,27 +109,31 @@ sub visitNameConstant {
 
 sub _Eval {
 	my $self = shift;
-	my($list_expr,$type) = @_;
+	my($list_expr, $type) = @_;
 	my $elt = pop @{$list_expr};
-	if (       $elt->isa('BinaryOp') ) {
-		my $right = $self->_Eval($list_expr,$type);
+	unless (ref $elt) {
+		$elt = $self->{symbtab}->Lookup($elt);
+	}
+	if (      $elt->isa('BinaryOp') ) {
+		my $right = $self->_Eval($list_expr, $type);
 		if (	   $elt->{op} eq '>>'
 				or $elt->{op} eq '<<' ) {
 			$right =~ s/[LU]+$//;
 		}
-		my $left = $self->_Eval($list_expr,$type);
+		my $left = $self->_Eval($list_expr, $type);
 		return "(" . $left . " " . $elt->{op} . " " . $right . ")";
-	} elsif (  $elt->isa('UnaryOp') ) {
-		my $right = $self->_Eval($list_expr,$type);
+	} elsif ( $elt->isa('UnaryOp') ) {
+		my $right = $self->_Eval($list_expr, $type);
 		return $elt->{op} . $right;
-	} elsif (  $elt->isa('Constant')
-			or $elt->isa('Enum') ) {
+	} elsif ( $elt->isa('Constant') ) {
 		return $elt->{c_name};
-	} elsif (  $elt->isa('Literal') ) {
-		$elt->visitName($self,$type);
+	} elsif ( $elt->isa('Enum') ) {
+		return $elt->{c_name};
+	} elsif ( $elt->isa('Literal') ) {
+		$elt->visitName($self, $type);
 		return $elt->{$self->{key}};
 	} else {
-		warn __PACKAGE__," _Eval: INTERNAL ERROR ",ref $elt,".\n";
+		warn __PACKAGE__,"::_Eval: INTERNAL ERROR ",ref $elt,".\n";
 		return undef;
 	}
 }
@@ -128,7 +142,7 @@ sub visitNameExpression {
 	my $self = shift;
 	my($node) = @_;
 	my @list_expr = @{$node->{list_expr}};		# create a copy
-	$node->{$self->{key}} = $self->_Eval(\@list_expr,$node->{type});
+	$node->{$self->{key}} = $self->_Eval(\@list_expr, $node->{type});
 }
 
 sub visitNameIntegerLiteral {
@@ -221,7 +235,6 @@ sub visitNameWideCharacterLiteral {
 sub visitNameFixedPtLiteral {
 	my $self = shift;
 	my($node) = @_;
-	my $type = $node->{type};
 	my $str = "\"";
 	$str .= $node->{value};
 	$str .= "\"";
@@ -245,22 +258,14 @@ sub visitNameBooleanLiteral {
 }
 
 #
-#	3.10	Type Declaration
+#	3.11	Type Declaration
 #
-
-sub visitNameTypeDeclarators {
-	my $self = shift;
-	my($node) = @_;
-	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);
-	}
-}
 
 sub visitNameTypeDeclarator {
 	my $self = shift;
 	my($node) = @_;
 	return if (exists $node->{modifier});	# native IDL2.2
-	$node->{type}->visitName($self);
+	$self->visitNameType($node->{type});
 	if (exists $node->{array_size}) {
 		foreach (@{$node->{array_size}}) {
 			$_->visitName($self);			# expression
@@ -269,7 +274,7 @@ sub visitNameTypeDeclarator {
 }
 
 #
-#	3.10.1	Basic Types
+#	3.11.1	Basic Types
 #
 
 sub visitNameBasicType {
@@ -281,9 +286,9 @@ sub visitNameAnyType {
 }
 
 #
-#	3.10.2	Constructed Types
+#	3.11.2	Constructed Types
 #
-#	3.10.2.1	Structures
+#	3.11.2.1	Structures
 #
 
 sub visitNameStructType {
@@ -292,14 +297,14 @@ sub visitNameStructType {
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = 1;
 	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);				# single or array
+		$self->visitNameType($_);			# single or array
 	}
 }
 
 sub visitNameArray {
 	my $self = shift;
 	my($node) = @_;
-	$node->{type}->visitName($self);
+	$self->visitNameType($node->{type});
 	foreach (@{$node->{array_size}}) {
 		$_->visitName($self);				# expression
 	}
@@ -308,10 +313,10 @@ sub visitNameArray {
 sub visitNameSingle {
 	my $self = shift;
 	my($node) = @_;
-	$node->{type}->visitName($self);
+	$self->visitNameType($node->{type});
 }
 
-#	3.10.2.2	Discriminated Unions
+#	3.11.2.2	Discriminated Unions
 #
 
 sub visitNameUnionType {
@@ -319,7 +324,7 @@ sub visitNameUnionType {
 	my($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = 1;
-	$node->{type}->visitName($self);
+	$self->visitNameType($node->{type});
 	foreach (@{$node->{list_expr}}) {
 		$_->visitName($self);				# case
 	}
@@ -341,10 +346,10 @@ sub visitNameDefault {
 sub visitNameElement {
 	my $self = shift;
 	my($node) = @_;
-	$node->{value}->visitName($self);		# array or single
+	$self->visitNameType($node->{value});	# single or array
 }
 
-#	3.10.2.3	Enumerations
+#	3.11.2.4	Enumerations
 #
 
 sub visitNameEnumType {
@@ -362,25 +367,13 @@ sub visitNameEnum {
 }
 
 #
-#	3.10.3	Constructed Recursive Types and Forward Declarations
-#
-
-sub visitNameForwardStructType {
-	# empty
-}
-
-sub visitNameForwardUnionType {
-	# empty
-}
-
-#
-#	3.10.4	Template Types
+#	3.11.3	Template Types
 #
 
 sub visitNameSequenceType {
 	my $self = shift;
 	my($node) = @_;
-	$node->{type}->visitName($self);
+	$self->visitNameType($node->{type});
 	$node->{max}->visitName($self) if (exists $node->{max});
 }
 
@@ -399,30 +392,34 @@ sub visitNameWideStringType {
 sub visitNameFixedPtType {
 	my $self = shift;
 	my($node) = @_;
-	$node->{d}->visitName($self) if (exists $node->{d});
-	$node->{s}->visitName($self) if (exists $node->{s});
+	$node->{d}->visitName($self);
+	$node->{s}->visitName($self);
+}
+
+sub visitNameFixedPtConstType {
+	# empty
 }
 
 #
-#	3.11	Exception Declaration
+#	3.12	Exception Declaration
 #
 
 sub visitNameException {
 	my $self = shift;
 	my($node) = @_;
 	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);				# single or array
+		$self->visitNameType($_);			# single or array
 	}
 }
 
 #
-#	3.12	Operation Declaration
+#	3.13	Operation Declaration
 #
 
 sub visitNameOperation {
 	my $self = shift;
 	my($node) = @_;
-	$node->{type}->visitName($self);		# param_type_spec or void
+	$self->visitNameType($node->{type});	# param_type_spec or void
 	foreach (@{$node->{list_param}}) {
 		$_->visitName($self);				# parameter
 	}
@@ -431,7 +428,7 @@ sub visitNameOperation {
 sub visitNameParameter {
 	my $self = shift;
 	my($node) = @_;
-	$node->{type}->visitName($self);		# param_type_spec
+	$self->visitNameType($node->{type});	# param_type_spec
 }
 
 sub visitNameVoidType {
@@ -439,21 +436,75 @@ sub visitNameVoidType {
 }
 
 #
-#	3.13	Attribute Declaration
+#	3.14	Attribute Declaration
 #
-
-sub visitNameAttributes {
-	my $self = shift;
-	my($node) = @_;
-	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);				# attribute
-	}
-}
 
 sub visitNameAttribute {
 	my $self = shift;
 	my($node) = @_;
-	$node->{type}->visitName($self);		# param_type_spec
+	$self->visitNameType($node->{type});	# param_type_spec
+}
+
+#
+#	3.15	Repository Identity Related Declarations
+#
+
+sub visitNameTypeId {
+	# empty
+}
+
+sub visitNameTypePrefix {
+	# empty
+}
+
+#
+#	3.16	Event Declaration
+#
+
+#
+#	3.17	Component Declaration
+#
+
+sub visitNameProvides {
+	# empty
+}
+
+sub visitNameUses {
+	# empty
+}
+
+sub visitNamePublishes {
+	# empty
+}
+
+sub visitNameEmits {
+	# empty
+}
+
+sub visitNameConsumes {
+	# empty
+}
+
+#
+#	3.18	Home Declaration
+#
+
+sub visitNameFactory {
+	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	foreach (@{$node->{list_param}}) {
+		$_->visitName($self);				# parameter
+	}
+}
+
+sub visitNameFinder {
+	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	foreach (@{$node->{list_param}}) {
+		$_->visitName($self);				# parameter
+	}
 }
 
 1;

@@ -2,7 +2,7 @@ use strict;
 use UNIVERSAL;
 
 #
-#			Interface Definition Language (OMG IDL CORBA v2.4)
+#			Interface Definition Language (OMG IDL CORBA v3.0)
 #
 #			C Language Mapping Specification, New Edition June 1999
 #
@@ -18,8 +18,18 @@ sub new {
 	bless($self, $class);
 	my($parser) = @_;
 	$self->{key} = 'c_name';
-	$self->{srcname} = $parser->YYData->{srcname};
+	$self->{symbtab} = $parser->YYData->{symbtab};
 	return $self;
+}
+
+sub _get_defn {
+	my $self = shift;
+	my($defn) = @_;
+	if (ref $defn) {
+		return $defn;
+	} else {
+		return $self->{symbtab}->Lookup($defn);
+	}
 }
 
 #
@@ -28,16 +38,7 @@ sub new {
 sub _get_name {
 	my $self = shift;
 	my($node) = @_;
-	my $name = $node->{coll};
-	$name =~ s/^:://;
-	$name =~ s/::/_/g;
-	return $name;
-}
-
-sub _get_name_fwd {
-	my $self = shift;
-	my($node) = @_;
-	my $name = $node->{fwd}->{coll};
+	my $name = $node->{full};
 	$name =~ s/^:://;
 	$name =~ s/::/_/g;
 	return $name;
@@ -50,101 +51,62 @@ sub _get_name_fwd {
 sub visitNameSpecification {
 	my $self = shift;
 	my($node) = @_;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self);
+	foreach (@{$node->{list_export}}) {
+		$self->{symbtab}->Lookup($_)->visitName($self);
 	}
 }
 
 #
-#	3.6		Module Declaration
+#	3.7		Module Declaration
 #
 
-sub visitNameModule {
+sub visitNameModules {
 	my $self = shift;
 	my($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self);
+	foreach (@{$node->{list_export}}) {
+		$self->{symbtab}->Lookup($_)->visitName($self);
 	}
 }
 
 #
-#	3.7		Interface Declaration
+#	3.8		Interface Declaration
 #
 
-sub visitNameInterface {
+sub visitNameBaseInterface {
 	my $self = shift;
 	my($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
-	foreach (@{$node->{list_decl}}) {
-		if (	   $_->isa('Operation')
-				or $_->isa('Attributes') ) {
-			next;
-		}
-		$_->visitName($self);
-	}
-	if ($self->{srcname} eq $node->{filename}) {
-		if (keys %{$node->{hash_attribute_operation}}) {
-			$self->{itf} = $node->{$self->{key}};
-			foreach (values %{$node->{hash_attribute_operation}}) {
-				$_->visitName($self);
-			}
-			delete $self->{itf};
-		}
+	foreach (@{$node->{list_export}}) {
+		$self->{symbtab}->Lookup($_)->visitName($self);
 	}
 }
 
-sub visitNameForwardInterface {
+#
+#	3.9		Value Declaration
+#
+
+sub visitNameStateMember {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
-	$node->{$self->{key}} = $self->_get_name_fwd($node);
+	$node->{$self->{key}} = $self->_get_name($node);
+	$self->_get_defn($node->{type})->visitName($self);
+}
+
+sub visitNameInitializer {
+	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	$node->{$self->{key}} = $node->{idf};
+	foreach (@{$node->{list_param}}) {
+		$_->visitName($self);			# parameter
+	}
 }
 
 #
-#	3.8		Value Declaration
-#
-
-sub visitNameRegularValue {
-	# C mapping is aligned with CORBA 2.1
-	my $self = shift;
-	my($node) = @_;
-	return if (exists $node->{$self->{key}});
-	$node->{$self->{key}} = $self->_get_name($node);
-}
-
-sub visitNameBoxedValue {
-	# C mapping is aligned with CORBA 2.1
-	my $self = shift;
-	my($node) = @_;
-	return if (exists $node->{$self->{key}});
-	$node->{$self->{key}} = $self->_get_name($node);
-}
-
-sub visitNameAbstractValue {
-	# C mapping is aligned with CORBA 2.1
-	my $self = shift;
-	my($node) = @_;
-	return if (exists $node->{$self->{key}});
-	$node->{$self->{key}} = $self->_get_name($node);
-}
-
-sub visitNameForwardRegularValue {
-	# C mapping is aligned with CORBA 2.1
-	my $self = shift;
-	my($node) = @_;
-	$node->{$self->{key}} = $self->_get_name_fwd($node);
-}
-
-sub visitNameForwardAbstractValue {
-	# C mapping is aligned with CORBA 2.1
-	my $self = shift;
-	my($node) = @_;
-	$node->{$self->{key}} = $self->_get_name_fwd($node);
-}
-
-#
-#	3.9		Constant Declaration
+#	3.10	Constant Declaration
 #
 
 sub visitNameConstant {
@@ -158,16 +120,8 @@ sub visitNameExpression {
 }
 
 #
-#	3.10	Type Declaration
+#	3.11	Type Declaration
 #
-
-sub visitNameTypeDeclarators {
-	my $self = shift;
-	my($node) = @_;
-	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);
-	}
-}
 
 sub visitNameTypeDeclarator {
 	my $self = shift;
@@ -176,12 +130,12 @@ sub visitNameTypeDeclarator {
 		$node->{$self->{key}} = $node->{idf};
 	} else {
 		$node->{$self->{key}} = $self->_get_name($node);
-		$node->{type}->visitName($self);
+		$self->_get_defn($node->{type})->visitName($self);
 	}
 }
 
 #
-#	3.10.1	Basic Types
+#	3.11.1	Basic Types
 #
 #	See	1.7		Mapping for Basic Data Types
 #
@@ -195,9 +149,9 @@ sub visitNameBasicType {
 }
 
 #
-#	3.10.2	Constructed Types
+#	3.11.2	Constructed Types
 #
-#	3.10.2.1	Structures
+#	3.11.2.1	Structures
 #
 
 sub visitNameStructType {
@@ -206,7 +160,7 @@ sub visitNameStructType {
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
 	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);			# single or array
+		$self->_get_defn($_)->visitName($self);		# single or array
 	}
 }
 
@@ -214,17 +168,17 @@ sub visitNameArray {
 	my $self = shift;
 	my($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
-	$node->{type}->visitName($self);
+	$self->_get_defn($node->{type})->visitName($self);
 }
 
 sub visitNameSingle {
 	my $self = shift;
 	my($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
-	$node->{type}->visitName($self);
+	$self->_get_defn($node->{type})->visitName($self);
 }
 
-#	3.10.2.2	Discriminated Unions
+#	3.11.2.2	Discriminated Unions
 #
 
 sub visitNameUnionType {
@@ -232,7 +186,7 @@ sub visitNameUnionType {
 	my($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = $self->_get_name($node);
-	$node->{type}->visitName($self);
+	$self->_get_defn($node->{type})->visitName($self);
 	foreach (@{$node->{list_expr}}) {
 		$_->visitName($self);			# case
 	}
@@ -254,10 +208,10 @@ sub visitNameDefault {
 sub visitNameElement {
 	my $self = shift;
 	my($node) = @_;
-	$node->{value}->visitName($self);		# array or single
+	$self->_get_defn($node->{value})->visitName($self);		# single or array
 }
 
-#	3.10.2.3	Enumerations
+#	3.11.2.4	Enumerations
 #
 
 sub visitNameEnumType {
@@ -276,23 +230,7 @@ sub visitNameEnum {
 }
 
 #
-#	3.10.3	Constructed Recursive Types and Forward Declarations
-#
-
-sub visitNameForwardStructType {
-	my $self = shift;
-	my($node) = @_;
-	$node->{$self->{key}} = $self->_get_name_fwd($node);
-}
-
-sub visitNameForwardUnionType {
-	my $self = shift;
-	my($node) = @_;
-	$node->{$self->{key}} = $self->_get_name_fwd($node);
-}
-
-#
-#	3.10.4	Template Types
+#	3.11.3	Template Types
 #
 #	See	1.11	Mapping for Sequence Types
 #
@@ -300,10 +238,10 @@ sub visitNameForwardUnionType {
 sub visitNameSequenceType {
 	my $self = shift;
 	my($node) = @_;
-	my $type = $node->{type};
+	my $type = $self->_get_defn($node->{type});
 	while (		$type->isa('TypeDeclarator')
 			and ! exists $type->{array_size} ) {
-		$type = $type->{type};
+		$type = $self->_get_defn($type->{type});
 	}
 	$type->visitName($self);
 	my $name = $type->{$self->{key}};
@@ -338,15 +276,19 @@ sub visitNameWideStringType {
 sub visitNameFixedPtType {
 	my $self = shift;
 	my($node) = @_;
+	my $name = "CORBA_fixed_" . $node->{d}->{value} . "_" . $node->{s}->{value};
+	$node->{$self->{key}} = $name;
+}
+
+sub visitNameFixedPtConstType {
+	my $self = shift;
+	my($node) = @_;
 	my $name = "CORBA_fixed";
-	if (exists $node->{d}) {
-		$name .= "_" . $node->{d}->{value} . "_" . $node->{s}->{value};
-	}
 	$node->{$self->{key}} = $name;
 }
 
 #
-#	3.11	Exception Declaration
+#	3.12	Exception Declaration
 #
 
 sub visitNameException {
@@ -354,12 +296,12 @@ sub visitNameException {
 	my($node) = @_;
 	$node->{$self->{key}} = $self->_get_name($node);
 	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);			# single or array
+		$self->_get_defn($_)->visitName($self);		# single or array
 	}
 }
 
 #
-#	3.12	Operation Declaration
+#	3.13	Operation Declaration
 #
 #	See	1.4		Inheritance and Operation Names
 #
@@ -367,8 +309,8 @@ sub visitNameException {
 sub visitNameOperation {
 	my $self = shift;
 	my($node) = @_;
-	$node->{$self->{key}} = $self->{itf} . '_' . $node->{idf};
-	$node->{type}->visitName($self);
+	$node->{$self->{key}} = $node->{idf};
+	$self->_get_defn($node->{type})->visitName($self);
 	foreach (@{$node->{list_param}}) {
 		$_->visitName($self);			# parameter
 	}
@@ -378,7 +320,7 @@ sub visitNameParameter {
 	my $self = shift;
 	my($node) = @_;
 	$node->{$self->{key}} = $node->{idf};
-	$node->{type}->visitName($self);
+	$self->_get_defn($node->{type})->visitName($self);
 }
 
 sub visitNameVoidType {
@@ -388,7 +330,7 @@ sub visitNameVoidType {
 }
 
 #
-#	3.13	Attribute Declaration
+#	3.14	Attribute Declaration
 #
 
 sub visitNameAttribute {
@@ -398,698 +340,88 @@ sub visitNameAttribute {
 	$node->{_set}->visitName($self) if (exists $node->{_set});
 }
 
-##############################################################################
+#
+#	3.15	Repository Identity Related Declarations
+#
 
-package ClengthVisitor;
-
-# builds $node->{length}
-
-sub new {
-	my $proto = shift;
-	my $class = ref($proto) || $proto;
-	my $self = {};
-	bless($self, $class);
-	my($parser) = @_;
-	$self->{srcname} = $parser->YYData->{srcname};
-	$self->{done_hash} = {};
-	$self->{key} = 'c_name';
-	return $self;
+sub visitNameTypeId {
+	# empty
 }
 
-#	See	1.8		Mapping Considerations for Constructed Types
-#
-
-sub _get_length {
-	my $self = shift;
-	my($type) = @_;
-	if (	   $type->isa('AnyType')
-			or $type->isa('SequenceType')
-			or $type->isa('StringType')
-			or $type->isa('WideStringType')
-			or $type->isa('ObjectType') ) {
-		return 'variable';
-	}
-	if (	   $type->isa('StructType')
-			or $type->isa('UnionType')
-			or $type->isa('TypeDeclarator') ) {
-		return $type->{length};
-	}
-	return undef;
-}
-
-#
-#	3.5		OMG IDL Specification
-#
-
-sub visitNameSpecification {
-	my $self = shift;
-	my($node) = @_;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self);
-	}
-}
-
-#
-#	3.6		Module Declaration
-#
-
-sub visitNameModule {
-	my $self = shift;
-	my($node) = @_;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self);
-	}
-}
-
-#
-#	3.7		Interface Declaration
-#
-
-sub visitNameInterface {
-	my $self = shift;
-	my($node) = @_;
-	return if (exists $node->{length});
-	$node->{length} = 'variable';
-	foreach (@{$node->{list_decl}}) {
-		if (	   $_->isa('Operation')
-				or $_->isa('Attributes') ) {
-			next;
-		}
-		$_->visitName($self);				# builds $node->{length}
-	}
-	if ($self->{srcname} eq $node->{filename}) {
-		foreach (values %{$node->{hash_attribute_operation}}) {
-			$_->visitName($self);			# builds $node->{length}
-		}
-	}
-}
-
-sub visitNameForwardInterface {
+sub visitNameTypePrefix {
 	# empty
 }
 
 #
-#	3.8		Value Declaration
+#	3.16	Event Declaration
 #
 
-sub visitNameRegularValue {
+#
+#	3.17	Component Declaration
+#
+
+sub visitNameProvides {
 	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameBoxedValue {
+sub visitNameUses {
 	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameAbstractValue {
+sub visitNamePublishes {
 	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameForwardRegularValue {
+sub visitNameEmits {
 	# C mapping is aligned with CORBA 2.1
+	my $self = shift;
+	my($node) = @_;
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameForwardAbstractValue {
+sub visitNameConsumes {
 	# C mapping is aligned with CORBA 2.1
-}
-
-#
-#	3.9		Constant Declaration
-#
-
-sub visitNameConstant {
-}
-
-#
-#	3.10	Type Declaration
-#
-
-sub visitNameTypeDeclarators {
 	my $self = shift;
 	my($node) = @_;
-	foreach (@{$node->{list_value}}) {
-		$_->visitName($self);
-	}
+	return if (exists $node->{$self->{key}});
+	$node->{$self->{key}} = $self->_get_name($node);
 }
 
-sub visitNameTypeDeclarator {
+#
+#	3.18	Home Declaration
+#
+
+sub visitNameFactory {
+	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my($node) = @_;
-	return if (exists $node->{modifier});	# native IDL2.2
-	if (	   $node->{type}->isa('StructType')
-			or $node->{type}->isa('UnionType')
-			or $node->{type}->isa('EnumType')
-			or $node->{type}->isa('SequenceType')
-			or $node->{type}->isa('FixedPtType') ) {
-		$node->{type}->visitName($self);
-	}
-	$node->{length} = $self->_get_length($node->{type});
-}
-
-#
-#	3.10.1	Basic Types
-#
-
-sub visitNameBasicType {
-	# fixed length
-}
-
-#
-#	3.10.2	Constructed Types
-#
-#	3.10.2.1	Structures
-#
-
-sub visitNameStructType {
-	my $self = shift;
-	my($node) = @_;
-	return if (exists $self->{done_hash}->{$node->{$self->{key}}});
-	$self->{done_hash}->{$node->{$self->{key}}} = 1;
-	$node->{length} = undef;
-	foreach (@{$node->{list_expr}}) {
-		if (	   $_->{type}->isa('StructType')
-				or $_->{type}->isa('UnionType')
-				or $_->{type}->isa('SequenceType')
-				or $_->{type}->isa('StringType')
-				or $_->{type}->isa('WideStringType')
-				or $_->{type}->isa('FixedPtType') ) {
-			$_->{type}->visitName($self);
-		}
-		$node->{length} ||= $self->_get_length($_->{type});
-	}
-}
-
-#	3.10.2.2	Discriminated Unions
-#
-
-sub visitNameUnionType {
-	my $self = shift;
-	my($node) = @_;
-	return if (exists $self->{done_hash}->{$node->{$self->{key}}});
-	$self->{done_hash}->{$node->{$self->{key}}} = 1;
-	$node->{length} = undef;
-	foreach (@{$node->{list_expr}}) {
-		if (	   $_->{element}->{type}->isa('StructType')
-				or $_->{element}->{type}->isa('UnionType')
-				or $_->{element}->{type}->isa('SequenceType')
-				or $_->{element}->{type}->isa('StringType')
-				or $_->{element}->{type}->isa('WideStringType')
-				or $_->{element}->{type}->isa('FixedPtType') ) {
-			$_->{element}->{type}->visitName($self);
-		}
-		$node->{length} ||= $self->_get_length($_->{element}->{type});
-	}
-	if ($node->{type}->isa('EnumType')) {
-		$node->{type}->visitName($self);
-	}
-}
-
-#	3.10.2.3	Enumerations
-#
-
-sub visitNameEnumType {
-	# fixed length
-}
-
-#
-#	3.10.3	Constructed Recursive Types and Forward Declarations
-#
-
-sub visitNameForwardStructType {
-	# empty
-}
-
-sub visitNameForwardUnionType {
-	# empty
-}
-
-#
-#	3.10.4	Template Types
-#
-
-sub visitNameSequenceType {
-	my $self = shift;
-	my($node) = @_;
-	$node->{length} = 'variable';
-	if (	   $node->{type}->isa('SequenceType')
-			or $node->{type}->isa('StringType')
-			or $node->{type}->isa('WideStringType')
-			or $node->{type}->isa('FixedPtType') ) {
-		$node->{type}->visitName($self);
-	}
-}
-
-sub visitNameStringType {
-	my $self = shift;
-	my($node) = @_;
-	$node->{length} = 'variable';
-}
-
-sub visitNameWideStringType {
-	my $self = shift;
-	my($node) = @_;
-	$node->{length} = 'variable';
-}
-
-sub visitNameFixedPtType {
-	# fixed length
-}
-
-#
-#	3.11	Exception Declaration
-#
-
-sub visitNameException {
-	my $self = shift;
-	my($node) = @_;
-	$node->{length} = undef;
-	if (exists $node->{list_expr}) {
-		warn __PACKAGE__,"::visitNameException $node->{idf} : empty list_expr.\n"
-				unless (@{$node->{list_expr}});
-		foreach (@{$node->{list_expr}}) {
-			if (	   $_->{type}->isa('StructType')
-					or $_->{type}->isa('UnionType')
-					or $_->{type}->isa('SequenceType')
-					or $_->{type}->isa('FixedPtType') ) {
-				$_->{type}->visitName($self);
-			}
-			$node->{length} ||= $self->_get_length($_->{type});
-		}
-	}
-}
-
-#
-#	3.12	Operation Declaration
-#
-
-sub visitNameOperation {
-	my $self = shift;
-	my($node) = @_;
-	$node->{type}->visitName($self)
-			unless ($node->{type}->isa('VoidType'));
+	$node->{$self->{key}} = $node->{idf};
 	foreach (@{$node->{list_param}}) {
-		$_->{type}->visitName($self);
+		$_->visitName($self);			# parameter
 	}
 }
 
-#
-#	3.13	Attribute Declaration
-#
-
-sub visitNameAttribute {
-	my $self = shift;
-	my($node) = @_;
-	$node->{_get}->visitName($self);
-	$node->{_set}->visitName($self) if (exists $node->{_set});
-}
-
-##############################################################################
-
-package CtypeVisitor;
-
-# builds $node->{c_arg}
-
-sub new {
-	my $proto = shift;
-	my $class = ref($proto) || $proto;
-	my $self = {};
-	bless($self, $class);
-	my($parser) = @_;
-	$self->{srcname} = $parser->YYData->{srcname};
-	return $self;
-}
-
-#
-#	3.5		OMG IDL Specification
-#
-
-sub visitNameSpecification {
-	my $self = shift;
-	my($node) = @_;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self) if ($_->isa("Interface") or $_->isa("Module"));
-	}
-}
-
-#
-#	3.6		Module Declaration
-#
-
-sub visitNameModule {
-	my $self = shift;
-	my($node) = @_;
-	foreach (@{$node->{list_decl}}) {
-		$_->visitName($self) if ($_->isa("Interface") or $_->isa("Module"));
-	}
-}
-
-#
-#	3.7		Interface Declaration
-#
-
-sub visitNameInterface {
-	my $self = shift;
-	my($node) = @_;
-	if ($self->{srcname} eq $node->{filename}) {
-		foreach (values %{$node->{hash_attribute_operation}}) {
-			$_->visitName($self);			# builds $node->{c_arg}
-		}
-	}
-}
-
-#
-#	3.12	Operation Declaration
-#
-
-sub visitNameOperation {
-	my $self = shift;
-	my($node) = @_;
-	$node->{c_arg} = Cnameattr->NameAttr($node->{type},'','return');
-	foreach (@{$node->{list_param}}) {	# parameter
-		$_->{c_arg} = Cnameattr->NameAttr($_->{type},$_->{c_name},$_->{attr});
-	}
-}
-
-#
-#	3.13	Attribute Declaration
-#
-
-sub visitNameAttribute {
-	my $self = shift;
-	my($node) = @_;
-	$node->{_get}->visitName($self);
-	$node->{_set}->visitName($self) if (exists $node->{_set});
-}
-
-##############################################################################
-
-package Cnameattr;
-
-#
-#	See	1.21	Summary of Argument/Result Passing
-#
-
-# needs $node->{c_name} and $node->{length}
-
-sub NameAttr {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $class = ref $node;
-	$class = "BasicType" if ($node->isa("BasicType"));
-	$class = "AnyType" if ($node->isa("AnyType"));
-	my $func = 'NameAttr' . $class;
-	return $proto->$func($node,$v_name,$attr);
-}
-
-sub NameAttrInterface {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrRegularValue {
+sub visitNameFinder {
 	# C mapping is aligned with CORBA 2.1
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
+	my $self = shift;
+	my($node) = @_;
+	$node->{$self->{key}} = $node->{idf};
+	foreach (@{$node->{list_param}}) {
+		$_->visitName($self);			# parameter
 	}
-}
-
-sub NameAttrBoxedValue {
-	# C mapping is aligned with CORBA 2.1
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrAbstractValue {
-	# C mapping is aligned with CORBA 2.1
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameInterface : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrTypeDeclarator {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	if (exists $node->{array_size}) {
-#		my $t_name = $node->{type}->{c_name};
-#		my $array = '';
-#		foreach (@{$node->{array_size}}) {
-#			$array .= "[" . $_->{c_literal} . "]";
-#		}
-		my $t_name = $node->{c_name};
-		if (      $attr eq 'in' ) {
-#			return $t_name . " " . $v_name . $array;
-			return $t_name . " " . $v_name;
-		} elsif ( $attr eq 'inout' ) {
-#			return $t_name . " " . $v_name . $array;
-			return $t_name . " " . $v_name;
-		} elsif ( $attr eq 'out' ) {
-			if (defined $node->{length}) {		# variable
-				return $t_name . "_slice ** " . $v_name;
-			} else {
-#				return $t_name . " " . $v_name . $array;
-				return $t_name . " " . $v_name;
-			}
-		} elsif ( $attr eq 'return' ) {
-			return $t_name . "_slice *";
-		} else {
-			warn __PACKAGE__,"::NameTypeDeclarator array : ERROR_INTERNAL $attr \n";
-		}
-	} else {
-		return $proto->NameAttr($node->{type},$v_name,$attr);
-	}
-}
-
-sub NameAttrBasicType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameBasicType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrAnyType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	$node->{length} = 'variable';
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " * "  . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * "  . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " ** " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name . " *";
-	} else {
-		warn __PACKAGE__,"::NameAnyType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrStructType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		if (defined $node->{length}) {		# variable
-			return $t_name . " ** " . $v_name;
-		} else {
-			return $t_name . " * "  . $v_name;
-		}
-	} elsif ( $attr eq 'return' ) {
-		if (defined $node->{length}) {		# variable
-			return $t_name . " *";
-		} else {
-			return $t_name;
-		}
-	} else {
-		warn __PACKAGE__,"::NameStructType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrUnionType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		if (defined $node->{length}) {		# variable
-			return $t_name . " ** " . $v_name;
-		} else {
-			return $t_name . " * "  . $v_name;
-		}
-	} elsif ( $attr eq 'return' ) {
-		if (defined $node->{length}) {		# variable
-			return $t_name . " *";
-		} else {
-			return $t_name;
-		}
-	} else {
-		warn __PACKAGE__,"::NameUnionType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrEnumType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameEnumType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrSequenceType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " * "  . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * "  . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " ** " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name . " *";
-	} else {
-		warn __PACKAGE__,"::NameSequenceType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrStringType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-#	unless (defined $node->{length}) {
-#		$node->{length} = 'variable';
-#		warn "String without variable length\n";
-#	}
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameStringType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrWideStringType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-#	unless (defined $node->{length}) {
-#		$node->{length} = 'variable';
-#		warn "String without variable length\n";
-#	}
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " "   . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameWideStringType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrFixedPtType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if (      $attr eq 'in' ) {
-		return $t_name . " * "  . $v_name;
-	} elsif ( $attr eq 'inout' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'out' ) {
-		return $t_name . " * " . $v_name;
-	} elsif ( $attr eq 'return' ) {
-		return $t_name;
-	} else {
-		warn __PACKAGE__,"::NameFixedPtType : ERROR_INTERNAL $attr \n";
-	}
-}
-
-sub NameAttrVoidType {
-	my $proto = shift;
-	my($node, $v_name, $attr) = @_;
-	my $t_name = $node->{c_name};
-	if ($attr ne 'return') {
-		warn __PACKAGE__,"::NameVoidType : ERROR_INTERNAL \n";
-	}
-	return $t_name;
 }
 
 1;

@@ -1,6 +1,7 @@
 include.pm
 literal.pm
 name.pm
+type.pm
 idl2c.pl
 Changes
 MANIFEST
