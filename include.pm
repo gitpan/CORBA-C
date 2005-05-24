@@ -11,7 +11,7 @@ use POSIX qw(ctime);
 package CORBA::C::include;
 
 use vars qw($VERSION);
-$VERSION = '2.41';
+$VERSION = '2.42';
 
 package CORBA::C::includeVisitor;
 
@@ -139,7 +139,7 @@ sub visitModule {
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
 		my $filename = basename($self->{srcname}, ".idl") . ".h";
-		$filename =~ s/\./_/;
+		$filename =~ s/\./_/g;
 		my $defn = $self->{symbtab}->Lookup($node->{full});
 		print $FH "/*\n";
 		print $FH " * begin of module ",$node->{idf},"\n";

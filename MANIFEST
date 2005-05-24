@@ -2,9 +2,11 @@ include.pm
 literal.pm
 name.pm
 type.pm
+skel.pm
 idl2c.pl
 Changes
 MANIFEST
 Makefile.PL
 test.pl
 README
+META.yml                                 Module meta-data (added by MakeMaker)

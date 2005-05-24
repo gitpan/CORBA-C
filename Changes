@@ -1,5 +1,8 @@
 Revision history for Perl extension CORBA::C.
 
+2.42  Sat May 21 12:30:00 2005
+	- add skel.pm
+
 2.41  Mon Jun  7 08:30:00 2004
 	- better support for 'import'
 

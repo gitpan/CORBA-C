@@ -172,10 +172,35 @@ sub visitIntegerLiteral {
 	my $str = $node->{value};
 	$str =~ s/^\+//;
 	unless (exists $type->{auto}) {
+		if      ($node->{lexeme} =~ /^0+$/) {
+			$str = "0";
+		} elsif ($node->{lexeme} =~ /^0[Xx]/) {
+			my $fmt;
+			if      ($type->{value} eq 'octet') {
+				$fmt = "0x%02x";
+			} elsif ( $type->{value} eq 'short' ) {
+				$fmt = "0x%04x";
+			} elsif ( $type->{value} eq 'unsigned short' ) {
+				$fmt = "0x%04x";
+			} elsif ( $type->{value} eq 'long' ) {
+				$fmt = "0x%08x";
+			} elsif ( $type->{value} eq 'unsigned long' ) {
+				$fmt = "0x%08x";
+			} elsif ( $type->{value} eq 'long long' ) {
+				$fmt = "0x%016x";
+			} elsif ( $type->{value} eq 'unsigned long long' ) {
+				$fmt = "0x%016x";
+			}
+			$str = sprintf($fmt, $node->{value});
+		} elsif ($node->{lexeme} =~ /^0/) {
+			$str = sprintf("0%o", $node->{value});
+		} else {
+			$str = sprintf("%d", $node->{value});
+		}
 		if (	  $type->{value} eq 'short' ) {
 			$str = "(short)" . $str;
 		} elsif ( $type->{value} eq 'unsigned short' ) {
-			$str = "(unsigned short)" . $str;
+			$str = "(unsigned short)" . $str . "U";
 		} elsif ( $type->{value} eq 'long' ) {
 			$str .= "L";
 		} elsif ( $type->{value} eq 'unsigned long' ) {
