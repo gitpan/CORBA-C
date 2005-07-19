@@ -23,14 +23,13 @@ sub new {
 	return $self;
 }
 
-sub visitType {
+sub _get_defn {
 	my $self = shift;
-	my ($type) = @_;
-
-	if (ref $type) {
-		$type->visit($self);
+	my ($defn) = @_;
+	if (ref $defn) {
+		return $defn;
 	} else {
-		$self->{symbtab}->Lookup($type)->visit($self);
+		return $self->{symbtab}->Lookup($defn);
 	}
 }
 
@@ -47,7 +46,7 @@ sub visitSpecification {
 		}
 	}
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visit($self);
+		$self->_get_defn($_)->visit($self);
 	}
 }
 
@@ -59,7 +58,7 @@ sub visitImport {
 	my $self = shift;
 	my ($node) = @_;
 	foreach (@{$node->{list_decl}}) {
-		$self->{symbtab}->Lookup($_)->visit($self);
+		$self->_get_defn($_)->visit($self);
 	}
 }
 
@@ -71,7 +70,7 @@ sub visitModules {
 	my $self = shift;
 	my ($node) = @_;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visit($self);
+		$self->_get_defn($_)->visit($self);
 	}
 }
 
@@ -85,7 +84,7 @@ sub visitBaseInterface {
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = 1;
 	foreach (@{$node->{list_export}}) {
-		$self->{symbtab}->Lookup($_)->visit($self);
+		$self->_get_defn($_)->visit($self);
 	}
 }
 
@@ -101,7 +100,8 @@ sub visitStateMember {
 	# C mapping is aligned with CORBA 2.1
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{type});	# type_spec
+	my $type = $self->_get_defn($node->{type});
+	$type->visit($self);
 	if (exists $node->{array_size}) {
 		foreach (@{$node->{array_size}}) {
 			$_->visit($self);			# expression
@@ -131,10 +131,7 @@ sub visitConstant {
 sub _Eval {
 	my $self = shift;
 	my ($list_expr, $type) = @_;
-	my $elt = pop @{$list_expr};
-	unless (ref $elt) {
-		$elt = $self->{symbtab}->Lookup($elt);
-	}
+	my $elt = $self->_get_defn(pop @{$list_expr});
 	if (      $elt->isa('BinaryOp') ) {
 		my $right = $self->_Eval($list_expr, $type);
 		if (	   $elt->{op} eq '>>'
@@ -163,11 +160,15 @@ sub visitExpression {
 	my $self = shift;
 	my ($node) = @_;
 	my @list_expr = @{$node->{list_expr}};		# create a copy
-	$node->{$self->{key}} = $self->_Eval(\@list_expr, $node->{type});
+	my $type = $self->_get_defn($node->{type});
+	while ($type->isa('TypeDeclarator')) {
+		$type = $self->_get_defn($type->{type});
+	}
+	$node->{$self->{key}} = $self->_Eval(\@list_expr, $type);
 }
 
 sub visitIntegerLiteral {
-	my $self = shift;
+	my $self = shift;  
 	my ($node, $type) = @_;
 	my $str = $node->{value};
 	$str =~ s/^\+//;
@@ -312,7 +313,8 @@ sub visitBooleanLiteral {
 sub visitTypeDeclarator {
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{type});
+	my $type = $self->_get_defn($node->{type});
+	$type->visit($self);
 	if (exists $node->{array_size}) {
 		foreach (@{$node->{array_size}}) {
 			$_->visit($self);			# expression
@@ -348,14 +350,15 @@ sub visitStructType {
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = 1;
 	foreach (@{$node->{list_member}}) {
-		$self->visitType($_);			# member
+		$self->_get_defn($_)->visit($self);		# member
 	}
 }
 
 sub visitMember {
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{type});
+	my $type = $self->_get_defn($node->{type});
+	$type->visit($self);
 	if (exists $node->{array_size}) {
 		foreach (@{$node->{array_size}}) {
 			$_->visit($self);				# expression
@@ -371,7 +374,8 @@ sub visitUnionType {
 	my ($node) = @_;
 	return if (exists $node->{$self->{key}});
 	$node->{$self->{key}} = 1;
-	$self->visitType($node->{type});
+	my $type = $self->_get_defn($node->{type});
+	$type->visit($self);
 	foreach (@{$node->{list_expr}}) {
 		$_->visit($self);				# case
 	}
@@ -393,7 +397,7 @@ sub visitDefault {
 sub visitElement {
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{value});	# member
+	$self->_get_defn($node->{value})->visit($self);	# member
 }
 
 #	3.11.2.4	Enumerations
@@ -420,7 +424,8 @@ sub visitEnum {
 sub visitSequenceType {
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{type});
+	my $type = $self->_get_defn($node->{type});
+	$type->visit($self);
 	$node->{max}->visit($self) if (exists $node->{max});
 }
 
@@ -455,7 +460,7 @@ sub visitException {
 	my $self = shift;
 	my ($node) = @_;
 	foreach (@{$node->{list_member}}) {
-		$self->visitType($_);			# member
+		$self->_get_defn($_)->visit($self);			# member
 	}
 }
 
@@ -466,7 +471,8 @@ sub visitException {
 sub visitOperation {
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{type});	# param_type_spec or void
+	my $type = $self->_get_defn($node->{type});	# param_type_spec or void
+	$type->visit($self);
 	foreach (@{$node->{list_param}}) {
 		$_->visit($self);				# parameter
 	}
@@ -475,7 +481,8 @@ sub visitOperation {
 sub visitParameter {
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{type});	# param_type_spec
+	my $type = $self->_get_defn($node->{type});	# param_type_spec
+	$type->visit($self);
 }
 
 sub visitVoidType {
@@ -489,7 +496,8 @@ sub visitVoidType {
 sub visitAttribute {
 	my $self = shift;
 	my ($node) = @_;
-	$self->visitType($node->{type});	# param_type_spec
+	my $type = $self->_get_defn($node->{type});	# param_type_spec
+	$type->visit($self);
 }
 
 #

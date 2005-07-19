@@ -11,7 +11,7 @@ use POSIX qw(ctime);
 package CORBA::C::include;
 
 use vars qw($VERSION);
-$VERSION = '2.42';
+$VERSION = '2.43';
 
 package CORBA::C::includeVisitor;
 
@@ -94,7 +94,7 @@ sub visitSpecification {
 	my $self = shift;
 	my ($node) = @_;
 	my $FH = $self->{out};
-	print $FH "/* This file was generated (by ",$0,"). DO NOT modify it */\n";
+	print $FH "/* This file was generated (by ",basename($0),"). DO NOT modify it */\n";
 	print $FH "/* From file : ",$self->{srcname},", ",$self->{srcname_size}," octets, ",POSIX::ctime($self->{srcname_mtime});
 	print $FH " */\n";
 	print $FH "\n";
@@ -142,7 +142,7 @@ sub visitModule {
 		$filename =~ s/\./_/g;
 		my $defn = $self->{symbtab}->Lookup($node->{full});
 		print $FH "/*\n";
-		print $FH " * begin of module ",$node->{idf},"\n";
+		print $FH " * begin of module ",$defn->{c_name},"\n";
 		print $FH " */\n";
 		print $FH "#ifndef _",$self->{prefix},$defn->{c_name},"_",$filename,"_defined\n";
 		print $FH "#define _",$self->{prefix},$defn->{c_name},"_",$filename,"_defined\n";
@@ -326,6 +326,8 @@ sub visitTypeDeclarator {
 		my $FH = $self->{out};
 		if (exists $self->{reposit}) {
 			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+			print $FH "#define uid_",$node->{c_name}," 0x",$node->{serial_uid},"ULL\n"
+					if (exists $node->{serial_uid});
 		}
 		if (exists $node->{array_size}) {
 			#
@@ -396,6 +398,8 @@ sub visitStructType {
 	if ($self->{srcname} eq $node->{filename}) {
 		if (exists $self->{reposit}) {
 			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+			print $FH "#define uid_",$node->{c_name}," 0x",$node->{serial_uid},"ULL\n"
+					if (exists $node->{serial_uid});
 		}
 		print $FH "typedef struct {\n";
 		foreach (@{$node->{list_expr}}) {
@@ -473,6 +477,8 @@ sub visitUnionType {
 	if ($self->{srcname} eq $node->{filename}) {
 		if (exists $self->{reposit}) {
 			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+			print $FH "#define uid_",$node->{c_name}," 0x",$node->{serial_uid},"ULL\n"
+					if (exists $node->{serial_uid});
 		}
 		print $FH "typedef struct {\n";
 		print $FH "\t",$type->{c_name}," _d; /* discriminator */\n";
@@ -543,13 +549,16 @@ sub visitForwardUnionType {
 sub visitEnumType {
 	my $self = shift;
 	my ($node) = @_;
-	return if (exists $self->{done_hash}->{$node->{idf}});
-	$self->{done_hash}->{$node->{idf}} = 1;
+	return if (exists $self->{done_hash}->{$node->{c_name}});
+	$self->{done_hash}->{$node->{c_name}} = 1;
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "/* enum ",$node->{idf}," */\n";
+		print $FH "/* enum ",$node->{c_name}," */\n";
+		print $FH "#define ",$node->{c_name}," CORBA_unsigned_long\n";
 		if (exists $self->{reposit}) {
-			print $FH "#define id_",$node->{idf}," \"",$node->{repos_id},"\"\n";
+			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+			print $FH "#define uid_",$node->{c_name}," 0x",$node->{serial_uid},"ULL\n"
+					if (exists $node->{serial_uid});
 		}
 		foreach (@{$node->{list_expr}}) {
 			$_->visit($self);				# enum
@@ -690,7 +699,7 @@ sub visitException {
 	}
 	my $FH = $self->{out};
 	if ($self->{srcname} eq $node->{filename}) {
-		print $FH "/* exception ",$node->{idf}," */\n";
+		print $FH "/* exception ",$node->{c_name}," */\n";
 		print $FH "typedef struct ",$node->{c_name}," {\n";
 		if (exists $node->{list_expr}) {
 			foreach (@{$node->{list_expr}}) {
@@ -701,6 +710,10 @@ sub visitException {
 		}
 		print $FH "} ",$node->{c_name},";\n";
 		print $FH "#define ex_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+		if (exists $self->{reposit}) {
+			print $FH "#define uid_",$node->{c_name}," 0x",$node->{serial_uid},"ULL\n"
+					if (exists $node->{serial_uid});
+		}
 		if (exists $self->{use_define}) {
 			print $FH "#define ",$node->{c_name},"__alloc(nb)\t(",$node->{c_name}," *)CORBA_alloc((nb) * sizeof(",$node->{c_name},"))\n";
 		} else {

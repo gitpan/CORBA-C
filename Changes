@@ -1,5 +1,9 @@
 Revision history for Perl extension CORBA::C.
 
+2.43  Tue Jul 19 18:30:00 2005
+	- new enum mapping
+	- add uidVisitor
+
 2.42  Sat May 21 12:30:00 2005
 	- add skel.pm
 

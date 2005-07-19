@@ -80,7 +80,7 @@ sub visitImport {
 sub visitModules {
 	my $self = shift;
 	my ($node) = @_;
-	$node->{$self->{key}} = $node->{idf};
+	$node->{$self->{key}} = $self->_get_name($node);
 	foreach (@{$node->{list_export}}) {
 		$self->{symbtab}->Lookup($_)->visit($self);
 	}
@@ -236,7 +236,7 @@ sub visitElement {
 sub visitEnumType {
 	my $self = shift;
 	my ($node) = @_;
-	$node->{$self->{key}} = "CORBA_long";
+	$node->{$self->{key}} = $self->_get_name($node);
 	foreach (@{$node->{list_expr}}) {
 		$_->visit($self);			# enum
 	}
