@@ -1,5 +1,9 @@
 Revision history for Perl extension CORBA::C.
 
+2.44  Mon Nov 28 22:30:00 2005
+	- add repos_id for RegularInterface
+	- add skelCppVisitor compatible with C mapping
+
 2.43  Tue Jul 19 18:30:00 2005
 	- new enum mapping
 	- add uidVisitor

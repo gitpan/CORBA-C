@@ -11,7 +11,7 @@ use POSIX qw(ctime);
 package CORBA::C::include;
 
 use vars qw($VERSION);
-$VERSION = '2.43';
+$VERSION = '2.44';
 
 package CORBA::C::includeVisitor;
 
@@ -177,6 +177,9 @@ sub visitRegularInterface {
 		print $FH "#ifndef _",$self->{prefix},$node->{c_name},"_defined\n";
 		print $FH "#define _",$self->{prefix},$node->{c_name},"_defined\n";
 		print $FH "\n";
+		if (exists $self->{reposit}) {
+			print $FH "#define id_",$node->{c_name}," \"",$node->{repos_id},"\"\n";
+		}
 		print $FH "typedef CORBA_Object ",$node->{c_name},";\n";
 		print $FH "\n";
 		foreach (@{$node->{list_decl}}) {
