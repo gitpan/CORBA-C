@@ -1,4 +1,5 @@
 use strict;
+use warnings;
 use UNIVERSAL;
 use POSIX qw(ctime);
 
@@ -11,7 +12,7 @@ use POSIX qw(ctime);
 package CORBA::C::include;
 
 use vars qw($VERSION);
-$VERSION = '2.44';
+$VERSION = '2.45';
 
 package CORBA::C::includeVisitor;
 

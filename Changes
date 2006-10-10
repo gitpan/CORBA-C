@@ -1,5 +1,8 @@
 Revision history for Perl extension CORBA::C.
 
+2.45  Tue Oct 10 18:30:00 2006
+	- improve typedef in parameter
+
 2.44  Mon Nov 28 22:30:00 2005
 	- add repos_id for RegularInterface
 	- add skelCppVisitor compatible with C mapping
