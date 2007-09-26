@@ -1,11 +1,11 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         CORBA-C
-version:      2.45
-version_from: include.pm
+version:      2.46
+version_from: lib/CORBA/C.pm
 installdirs:  site
 requires:
-    CORBA::IDL::node:              2.45
+    CORBA::IDL:                    2.47
 
 distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.17
+generated_by: ExtUtils::MakeMaker version 6.30

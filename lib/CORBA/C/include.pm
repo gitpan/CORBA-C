@@ -9,11 +9,6 @@ use POSIX qw(ctime);
 #			C Language Mapping Specification, New Edition June 1999
 #
 
-package CORBA::C::include;
-
-use vars qw($VERSION);
-$VERSION = '2.45';
-
 package CORBA::C::includeVisitor;
 
 use File::Basename;

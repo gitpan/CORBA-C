@@ -1,12 +1,14 @@
-include.pm
-literal.pm
-name.pm
-type.pm
-skel.pm
-idl2c.pl
+lib/CORBA/C.pm
+lib/CORBA/C/include.pm
+lib/CORBA/C/literal.pm
+lib/CORBA/C/name.pm
+lib/CORBA/C/type.pm
+lib/CORBA/C/skel.pm
+bin/idl2c
 Changes
 MANIFEST
 Makefile.PL
 test.pl
 README
+
 META.yml                                 Module meta-data (added by MakeMaker)

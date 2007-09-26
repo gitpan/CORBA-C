@@ -3,22 +3,17 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME'          => 'CORBA::C',
-    'VERSION_FROM'  => 'include.pm',
+    'VERSION_FROM'  => 'lib/CORBA/C.pm',
     'ABSTRACT'      => 'IDL compiler to C include file',
     'PREREQ_PM'     => {
-                        'CORBA::IDL::node'  => 2.45,
+                        'CORBA::IDL'    => 2.47,
     },
-    'PM'            => {
-                        'include.pm'    => '$(INST_LIBDIR)/C/include.pm',
-                        'literal.pm'    => '$(INST_LIBDIR)/C/literal.pm',
-                        'name.pm'       => '$(INST_LIBDIR)/C/name.pm',
-                        'type.pm'       => '$(INST_LIBDIR)/C/type.pm',
-                        'skel.pm'	=> '$(INST_LIBDIR)/C/skel.pm',
-},
-    'EXE_FILES'     => ['idl2c.pl'],
+    'INSTALLDIRS'   => 'site',
+    'EXE_FILES'     => [ 'bin/idl2c' ],
     'AUTHOR'        => "Francois PERRAD (francois.perrad\@gadz.org)",
     'dist'          => {
                         'COMPRESS'      => 'gzip',
                         'SUFFIX'        => '.gz',
     },
 );
+

@@ -3,8 +3,10 @@
 use strict;
 use warnings;
 
+use CORBA::IDL;
 use CORBA::IDL::parser30;
 use CORBA::IDL::symbtab;
+use CORBA::C;
 # visitors
 use CORBA::IDL::repos_id;
 use CORBA::C::literal;
@@ -26,13 +28,14 @@ if ($Parser::IDL_version lt '3.0') {
 if ($^O eq 'MSWin32') {
 	$parser->YYData->{preprocessor} = 'cpp -C ' . $cflags;
 #	$parser->YYData->{preprocessor} = 'CL /E /C /nologo ' . $cflags;	# Microsoft VC
-} else {
+}
+else {
 	$parser->YYData->{preprocessor} = 'cpp -C ' . $cflags;
 }
-$parser->getopts("hi:vx");
+$parser->getopts('hi:vx');
 if ($parser->YYData->{opt_v}) {
-	print "CORBA::C $CORBA::C::include::VERSION\n";
-	print "CORBA::IDL $CORBA::IDL::node::VERSION\n";
+	print "CORBA::C $CORBA::C::VERSION\n";
+	print "CORBA::IDL $CORBA::IDL::VERSION\n";
 	print "IDL $Parser::IDL_version\n";
 	print "$0\n";
 	print "Perl $] on $^O\n";
@@ -151,7 +154,7 @@ cpp, perl
 
 =head1 COPYRIGHT
 
-(c) 2001-2004 Francois PERRAD, France. All rights reserved.
+(c) 2001-2007 Francois PERRAD, France. All rights reserved.
 
 This program and all CORBA::C modules are distributed
 under the terms of the Artistic Licence.

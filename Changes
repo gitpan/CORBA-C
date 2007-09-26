@@ -1,5 +1,8 @@
 Revision history for Perl extension CORBA::C.
 
+2.46  Wed Sep 26 12:30:00 2007
+	- reorg: more compliant with CPAN requirements
+
 2.45  Tue Oct 10 18:30:00 2006
 	- improve typedef in parameter
 
