@@ -1,9 +1,12 @@
 lib/CORBA/C.pm
-lib/CORBA/C/include.pm
-lib/CORBA/C/literal.pm
-lib/CORBA/C/name.pm
-lib/CORBA/C/type.pm
-lib/CORBA/C/skel.pm
+lib/CORBA/C/IncludeVisitor.pm
+lib/CORBA/C/IncSkelVisitor.pm
+lib/CORBA/C/LiteralVisitor.pm
+lib/CORBA/C/NameVisitor.pm
+lib/CORBA/C/LengthVisitor.pm
+lib/CORBA/C/TypeVisitor.pm
+lib/CORBA/C/SkeletonVisitor.pm
+lib/CORBA/C/SkelCppVisitor.pm
 bin/idl2c
 Changes
 MANIFEST

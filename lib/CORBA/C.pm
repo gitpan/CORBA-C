@@ -1,9 +1,15 @@
 use strict;
+use warnings;
 
 package CORBA::C;
 
-use vars qw($VERSION);
-$VERSION = '2.46';
+our $VERSION = '2.60';
+
+use CORBA::C::LiteralVisitor;
+use CORBA::C::NameVisitor;
+use CORBA::C::LengthVisitor;
+use CORBA::C::TypeVisitor;
+use CORBA::C::IncludeVisitor;
 
 1;
 
