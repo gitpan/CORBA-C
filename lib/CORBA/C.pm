@@ -3,7 +3,7 @@ use warnings;
 
 package CORBA::C;
 
-our $VERSION = '2.60';
+our $VERSION = '2.61';
 
 use CORBA::C::LiteralVisitor;
 use CORBA::C::NameVisitor;

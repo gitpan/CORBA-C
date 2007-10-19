@@ -10,7 +10,7 @@ package CORBA::C::IncludeVisitor;
 use strict;
 use warnings;
 
-our $VERSION = '2.60';
+our $VERSION = '2.61';
 
 use File::Basename;
 use POSIX qw(ctime);
@@ -62,7 +62,9 @@ sub _no_mapping {
     my ($node) = @_;
     my $FH = $self->{out};
     if ($self->{srcname} eq $node->{filename}) {
-        if (ref($node) =~ /^Forward/) {
+        my $class = ref $node;
+        $class = substr $class, rindex($class, ':') + 1;
+        if ($class =~ /^Forward/) {
             $node = $self->{symbtab}->Lookup($node->{full});
         }
         print $FH "\n";
