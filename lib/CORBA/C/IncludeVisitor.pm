@@ -10,7 +10,7 @@ package CORBA::C::IncludeVisitor;
 use strict;
 use warnings;
 
-our $VERSION = '2.61';
+our $VERSION = '2.62';
 
 use File::Basename;
 use POSIX qw(ctime);
@@ -95,6 +95,7 @@ sub visitSpecification {
     my $self = shift;
     my ($node) = @_;
     my $FH = $self->{out};
+    print $FH "/* ex: set ro: */\n";
     print $FH "/* This file was generated (by ",basename($0),"). DO NOT modify it */\n";
     print $FH "/* From file : ",$self->{srcname},", ",$self->{srcname_size}," octets, ",POSIX::ctime($self->{srcname_mtime});
     print $FH " */\n";
@@ -116,6 +117,12 @@ sub visitSpecification {
     }
     print $FH "\n";
     print $FH "/* end of file : ",$self->{filename}," */\n";
+    print $FH "\n";
+    print $FH "/*\n";
+    print $FH " * Local variables:\n";
+    print $FH " *   buffer-read-only: t\n";
+    print $FH " * End:\n";
+    print $FH " */\n";    
     close $FH;
 }
 
